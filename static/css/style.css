@@ -1,0 +1,15 @@
+/* ====================================================================
+   CSS TÙY BIẾN CHO HỆ THỐNG QUẢN LÝ KHÁCH SẠN
+   PHỤ TRÁCH: NHƯ
+   ==================================================================== */
+
+/* TODO (Như): Viết CSS bổ sung tại đây nếu cần tùy chỉnh giao diện */
+body {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+main {
+    flex: 1;
+}

@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block title %}Danh Sách Khách Sạn - Phụ trách: Định{% endblock %}
+
+{% block content %}
+<!-- ================================================================
+     PHỤ TRÁCH: ĐỊNH (Quản lý Khách sạn)
+     Bảng dữ liệu: hotels (hotel_id, name, phone, address, city, country, amenities)
+     
+     TODO (Định):
+     1. Form thêm mới Khách sạn (POST về /hotels/add)
+     2. Bảng hiển thị danh sách khách sạn (lặp qua biến `hotels`)
+     3. Nút bấm "Xem danh sách phòng" dẫn tới /hotels/{hotel_id}/rooms (Query Q1)
+================================================================ -->
+
+<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+    <div>
+        <h1 class="text-2xl font-bold text-slate-900 flex items-center gap-2">
+            <span>🏨</span> Quản Lý Khách Sạn
+        </h1>
+        <p class="text-sm text-slate-500 mt-1">Dữ liệu từ bảng <code class="text-cyan-600 bg-cyan-50 px-1.5 py-0.5 rounded">hotels</code></p>
+    </div>
+    <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-cyan-100 text-cyan-800 border border-cyan-200">
+        Phụ trách: Định
+    </span>
+</div>
+
+<div class="bg-slate-50 border-2 border-dashed border-slate-300 rounded-2xl p-8 text-center">
+    <div class="w-12 h-12 rounded-full bg-cyan-100 text-cyan-600 flex items-center justify-center mx-auto mb-3 text-xl">
+        <i class="bi bi-code-square"></i>
+    </div>
+    <h3 class="font-semibold text-slate-800 mb-1">Khu vực code của Định</h3>
+    <p class="text-sm text-slate-500 max-w-md mx-auto mb-4">
+        File: <code class="text-indigo-600 font-mono">templates/hotels.html</code>.<br>
+        Sử dụng Tailwind CSS (các class: <code class="text-xs bg-slate-200 px-1 py-0.5 rounded">table</code>, <code class="text-xs bg-slate-200 px-1 py-0.5 rounded">bg-white</code>, <code class="text-xs bg-slate-200 px-1 py-0.5 rounded">rounded-xl</code>, <code class="text-xs bg-slate-200 px-1 py-0.5 rounded">shadow-sm</code>) để dựng Form thêm khách sạn và Bảng danh sách.
+    </p>
+</div>
+
+<!-- TODO (Định): Viết Form thêm khách sạn và Bảng hiển thị tại đây -->
+
+{% endblock %}

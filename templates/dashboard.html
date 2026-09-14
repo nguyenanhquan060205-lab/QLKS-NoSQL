@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard Thống Kê - Phụ trách: Như{% endblock %}
+
+{% block content %}
+<!-- ================================================================
+     PHỤ TRÁCH: NHƯ (Thống kê & Dashboard)
+     
+     TODO (Như):
+     1. Thiết kế các Card thống kê tổng số (khách sạn, phòng trống, lượt đặt, doanh thu) từ biến `stats`
+        bằng Tailwind CSS (grid, grid-cols-1 md:grid-cols-4, bg-white, rounded-2xl, shadow-sm...)
+     2. (Nâng cao) Nhúng Chart.js vẽ biểu đồ doanh thu hoặc trạng thái phòng
+================================================================ -->
+
+<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+    <div>
+        <h1 class="text-2xl font-bold text-slate-900 flex items-center gap-2">
+            <span>📊</span> Dashboard Thống Kê
+        </h1>
+        <p class="text-sm text-slate-500 mt-1">Tổng quan chỉ số hoạt động của chuỗi khách sạn NoSQL</p>
+    </div>
+    <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">
+        Phụ trách: Như
+    </span>
+</div>
+
+<div class="bg-slate-50 border-2 border-dashed border-slate-300 rounded-2xl p-8 text-center">
+    <div class="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto mb-3 text-xl">
+        <i class="bi bi-bar-chart"></i>
+    </div>
+    <h3 class="font-semibold text-slate-800 mb-1">Khu vực code của Như</h3>
+    <p class="text-sm text-slate-500 max-w-md mx-auto mb-4">
+        File: <code class="text-indigo-600 font-mono">templates/dashboard.html</code>.<br>
+        Tạo các thẻ card chỉ số thống kê (Grid Tailwind) và nhúng biểu đồ Chart.js trực quan.
+    </p>
+</div>
+
+<!-- TODO (Như): Viết các card thống kê và biểu đồ tại đây -->
+
+{% endblock %}

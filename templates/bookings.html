@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block title %}Quản Lý Đặt Phòng - Phụ trách: Quân{% endblock %}
+
+{% block content %}
+<!-- ================================================================
+     PHỤ TRÁCH: QUÂN (Nghiệp vụ Đặt phòng - Query Q2, Q3, Q5 BATCH)
+     Bảng dữ liệu: 
+       - bookings_by_guest (guest_id, booking_id, hotel_id, room_number, check_in_date, check_out_date, status, total_amount)
+       - bookings_by_hotel_date (hotel_id, check_in_date, booking_id, guest_id, guest_name, room_number, status)
+     
+     TODO (Quân):
+     1. Form tạo Đặt phòng mới (POST về /bookings/create - gọi BATCH INSERT Q5)
+     2. Form tra cứu đặt phòng theo khách sạn & ngày check-in (GET về /bookings/hotel-date - Query Q3)
+     3. Bảng hiển thị danh sách đặt phòng
+     4. Nút bấm xem Hóa đơn dẫn tới /invoices/{booking_id} (Query Q4)
+================================================================ -->
+
+<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+    <div>
+        <h1 class="text-2xl font-bold text-slate-900 flex items-center gap-2">
+            <span>📅</span> Quản Lý Đặt Phòng
+        </h1>
+        <p class="text-sm text-slate-500 mt-1">
+            Trọng tâm: <span class="text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded font-medium">BATCH INSERT Q5</span> (Ghi đồng thời 2 bảng: bookings_by_guest & bookings_by_hotel_date)
+        </p>
+    </div>
+    <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-200">
+        Phụ trách: Quân
+    </span>
+</div>
+
+<div class="bg-slate-50 border-2 border-dashed border-slate-300 rounded-2xl p-8 text-center">
+    <div class="w-12 h-12 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center mx-auto mb-3 text-xl">
+        <i class="bi bi-calendar2-check"></i>
+    </div>
+    <h3 class="font-semibold text-slate-800 mb-1">Khu vực code của Quân</h3>
+    <p class="text-sm text-slate-500 max-w-md mx-auto mb-4">
+        File: <code class="text-indigo-600 font-mono">templates/bookings.html</code>.<br>
+        Dùng Tailwind CSS dựng Form đặt phòng (sử dụng Batch Statement), bộ lọc tìm kiếm theo khách hoặc ngày check-in và bảng hiển thị.
+    </p>
+</div>
+
+<!-- TODO (Quân): Viết Form tạo đặt phòng và Bảng danh sách tại đây -->
+
+{% endblock %}

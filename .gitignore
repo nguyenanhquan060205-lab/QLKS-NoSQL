@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+
+# Environment & Secrets (Không push token/mật khẩu lên Git)
+.env
+
+# AstraDB Secure Connect Bundle (File zip chứng chỉ bảo mật)
+*.zip
+
+# Virtual Environment
+venv/
+.venv/
+env/
+
+# OS
+.DS_Store

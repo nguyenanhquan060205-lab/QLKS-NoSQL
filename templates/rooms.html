@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+{% block title %}Danh Sách Phòng (Query Q1) - Phụ trách: Định{% endblock %}
+
+{% block content %}
+<!-- ================================================================
+     PHỤ TRÁCH: ĐỊNH (Quản lý Phòng - Query Q1 trong PDF)
+     Bảng dữ liệu: rooms_by_hotel (hotel_id, room_number, room_type, price_per_night, is_available)
+     
+     TODO (Định):
+     1. Form thêm phòng mới cho khách sạn hotel_id (POST về /hotels/{hotel_id}/rooms/add)
+     2. Bảng hiển thị danh sách phòng theo khách sạn (lặp qua biến `rooms`)
+================================================================ -->
+
+<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+    <div>
+        <h1 class="text-2xl font-bold text-slate-900 flex items-center gap-2">
+            <span>🛏️</span> Danh Sách Phòng: <span class="text-cyan-600">{{ hotel_id }}</span>
+        </h1>
+        <p class="text-sm text-slate-500 mt-1">
+            Query Q1: Bảng <code class="text-cyan-600 bg-cyan-50 px-1.5 py-0.5 rounded">rooms_by_hotel</code> (Partition Key: hotel_id)
+        </p>
+    </div>
+    <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-cyan-100 text-cyan-800 border border-cyan-200">
+        Phụ trách: Định (Query Q1)
+    </span>
+</div>
+
+<div class="bg-slate-50 border-2 border-dashed border-slate-300 rounded-2xl p-8 text-center">
+    <div class="w-12 h-12 rounded-full bg-cyan-100 text-cyan-600 flex items-center justify-center mx-auto mb-3 text-xl">
+        <i class="bi bi-door-open"></i>
+    </div>
+    <h3 class="font-semibold text-slate-800 mb-1">Khu vực code của Định</h3>
+    <p class="text-sm text-slate-500 max-w-md mx-auto mb-4">
+        File: <code class="text-indigo-600 font-mono">templates/rooms.html</code>.<br>
+        Viết Form thêm phòng và Bảng hiển thị các phòng của khách sạn bằng Tailwind CSS.
+    </p>
+</div>
+
+<!-- TODO (Định): Viết Form thêm phòng và Bảng danh sách tại đây -->
+
+{% endblock %}

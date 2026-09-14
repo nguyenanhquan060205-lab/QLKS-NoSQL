@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+{% block title %}Hóa Đơn Thanh Toán - Phụ trách: Quân{% endblock %}
+
+{% block content %}
+<!-- ================================================================
+     PHỤ TRÁCH: QUÂN (Hóa đơn - Query Q4 trong PDF)
+     Bảng dữ liệu: invoices_by_booking (booking_id, invoice_id, guest_name, hotel_id, issue_date, payment_method, payment_status, total_amount)
+     
+     TODO (Quân):
+     1. Hiển thị thông tin chi tiết hóa đơn dựa vào biến `invoice`
+     2. Hiển thị trạng thái thanh toán (PAID, UNPAID)
+================================================================ -->
+
+<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+    <div>
+        <h1 class="text-2xl font-bold text-slate-900 flex items-center gap-2">
+            <span>🧾</span> Hóa Đơn Thanh Toán
+        </h1>
+        <p class="text-sm text-slate-500 mt-1">
+            Query Q4: Bảng <code class="text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded">invoices_by_booking</code> theo booking_id
+        </p>
+    </div>
+    <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-200">
+        Phụ trách: Quân (Query Q4)
+    </span>
+</div>
+
+<div class="bg-slate-50 border-2 border-dashed border-slate-300 rounded-2xl p-8 text-center">
+    <div class="w-12 h-12 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center mx-auto mb-3 text-xl">
+        <i class="bi bi-receipt"></i>
+    </div>
+    <h3 class="font-semibold text-slate-800 mb-1">Khu vực code của Quân</h3>
+    <p class="text-sm text-slate-500 max-w-md mx-auto mb-4">
+        File: <code class="text-indigo-600 font-mono">templates/invoices.html</code>.<br>
+        Thiết kế phiếu hóa đơn thanh toán dạng card bằng Tailwind CSS.
+    </p>
+</div>
+
+<!-- TODO (Quân): Viết giao diện hiển thị chi tiết hóa đơn tại đây -->
+
+{% endblock %}
