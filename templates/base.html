@@ -18,6 +18,9 @@
     </style>
 </head>
 <body class="flex flex-col min-h-screen text-slate-800">
+    <a href="#main-content" class="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-lg focus:bg-white focus:px-4 focus:py-2 focus:font-semibold focus:text-slate-900 focus:shadow-lg focus:outline-none focus:ring-2 focus:ring-cyan-500">
+        Bỏ qua điều hướng
+    </a>
 
     <!-- NAVBAR HIỆN ĐẠI (Tailwind CSS v4 - Phụ trách: Như) -->
     <header class="bg-slate-900 border-b border-slate-800 sticky top-0 z-50">
@@ -63,7 +66,7 @@
 
                 <!-- Mobile Menu Button -->
                 <div class="md:hidden flex items-center">
-                    <button id="mobile-menu-btn" class="text-slate-400 hover:text-white p-2 focus:outline-none">
+                    <button id="mobile-menu-btn" type="button" aria-label="Mở menu điều hướng" aria-expanded="false" class="min-h-11 min-w-11 text-slate-400 hover:text-white p-2 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 transition motion-reduce:transition-none">
                         <i class="bi bi-list text-2xl"></i>
                     </button>
                 </div>
@@ -81,7 +84,19 @@
     </header>
 
     <!-- NỘI DUNG CHÍNH CỦA CÁC TRANG (Do từng thành viên code) -->
-    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <main id="main-content" class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8" tabindex="-1">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="space-y-3 mb-6" aria-live="polite">
+                    {% for category, message in messages %}
+                        <div role="alert" class="flex items-start gap-3 rounded-xl border px-4 py-3 text-sm shadow-sm {% if category == 'success' %}border-emerald-200 bg-emerald-50 text-emerald-800{% else %}border-red-200 bg-red-50 text-red-800{% endif %}">
+                            <i class="bi {% if category == 'success' %}bi-check-circle-fill{% else %}bi-exclamation-circle-fill{% endif %} mt-0.5" aria-hidden="true"></i>
+                            <span>{{ message }}</span>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
         {% block content %}
         <!-- Khung nội dung trang -->
         {% endblock %}
@@ -107,6 +122,7 @@
         if (menuBtn && mobileMenu) {
             menuBtn.addEventListener('click', () => {
                 mobileMenu.classList.toggle('hidden');
+                menuBtn.setAttribute('aria-expanded', String(!mobileMenu.classList.contains('hidden')));
             });
         }
     </script>
