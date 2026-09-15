@@ -11,34 +11,68 @@ from database.db import get_session
 
 def get_all_hotels():
     """
-    TODO (Định):
-    - Câu lệnh CQL: SELECT * FROM hotels;
-    - Trả về danh sách các khách sạn.
+    Lấy toàn bộ khách sạn từ bảng hotels.
+
+    Bảng hotels dùng hotel_id làm partition key. Truy vấn toàn bảng phù hợp
+    với phạm vi dữ liệu nhỏ của đồ án; nếu dữ liệu lớn cần thiết kế thêm bảng
+    chuyên phục vụ access pattern liệt kê khách sạn.
     """
     session = get_session()
     if not session:
         return []
-    
-    # query = "SELECT * FROM hotels;"
-    # rows = session.execute(query)
-    # return list(rows)
-    return []
+
+    try:
+        query = """
+            SELECT hotel_id, name, phone, address, city, country, amenities
+            FROM hotels;
+        """
+        rows = session.execute(query)
+        return list(rows)
+    except Exception as error:
+        print(f"Error fetching hotels: {error}")
+        return []
 
 
 def create_hotel(hotel_id, name, phone, address, city, country, amenities):
     """
-    TODO (Định):
-    - Câu lệnh CQL:
-      INSERT INTO hotels (hotel_id, name, phone, address, city, country, amenities)
-      VALUES (?, ?, ?, ?, ?, ?, ?);
-    - Lưu ý: amenities là kiểu dữ liệu set<text> trong Cassandra.
+    Thêm một khách sạn vào bảng hotels bằng prepared statement.
+
+    amenities được chuẩn hóa thành set để tương thích với kiểu set<text>
+    trong Cassandra. Hàm trả về True khi ghi thành công, ngược lại trả False.
     """
     session = get_session()
     if not session:
         return False
-    
-    # Viết code insert tại đây
-    pass
+
+    try:
+        query = session.prepare("""
+            INSERT INTO hotels (
+                hotel_id, name, phone, address, city, country, amenities
+            ) VALUES (?, ?, ?, ?, ?, ?, ?);
+        """)
+
+        if isinstance(amenities, str):
+            amenities = {
+                amenity.strip()
+                for amenity in amenities.split(",")
+                if amenity.strip()
+            }
+        else:
+            amenities = set(amenities or [])
+
+        session.execute(query, (
+            hotel_id,
+            name,
+            phone,
+            address,
+            city,
+            country,
+            amenities,
+        ))
+        return True
+    except Exception as error:
+        print(f"Error creating hotel: {error}")
+        return False
 
 
 # --------------------------------------------------------------------
@@ -83,30 +117,50 @@ def create_room(hotel_id, room_number, room_type, price_per_night, is_available=
 
 def get_all_guests():
     """
-    TODO (Định):
-    - Câu lệnh CQL: SELECT * FROM guests;
-    - Trả về danh sách khách hàng.
+    Lấy toàn bộ khách hàng từ bảng guests.
+
+    Tương tự hotels, đây là truy vấn toàn bảng dành cho dữ liệu đồ án nhỏ.
     """
     session = get_session()
     if not session:
         return []
 
-    # query = "SELECT * FROM guests;"
-    # rows = session.execute(query)
-    # return list(rows)
-    return []
+    try:
+        query = """
+            SELECT guest_id, full_name, email, phone, id_card
+            FROM guests;
+        """
+        rows = session.execute(query)
+        return list(rows)
+    except Exception as error:
+        print(f"Error fetching guests: {error}")
+        return []
 
 
 def create_guest(guest_id, full_name, email, phone, id_card):
     """
-    TODO (Định):
-    - Câu lệnh CQL:
-      INSERT INTO guests (guest_id, full_name, email, phone, id_card)
-      VALUES (?, ?, ?, ?, ?);
+    Thêm một khách hàng vào bảng guests bằng prepared statement.
+
+    Hàm trả về True khi ghi thành công, ngược lại trả False.
     """
     session = get_session()
     if not session:
         return False
 
-    # Viết code insert khách hàng tại đây
-    pass
+    try:
+        query = session.prepare("""
+            INSERT INTO guests (
+                guest_id, full_name, email, phone, id_card
+            ) VALUES (?, ?, ?, ?, ?);
+        """)
+        session.execute(query, (
+            guest_id,
+            full_name,
+            email,
+            phone,
+            id_card,
+        ))
+        return True
+    except Exception as error:
+        print(f"Error creating guest: {error}")
+        return False
