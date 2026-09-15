@@ -96,9 +96,11 @@ Kết quả: `Ran 6 tests ... OK`. Kiểm tra cú pháp bằng `py_compile` cũn
 
 Đã bổ sung `tests/test_hotel_service_integration.py` để xác nhận trực tiếp AC trên Cassandra/Astra DB. Bài test sử dụng hai ID cố định `H_QLKS04_TEST` và `G_QLKS04_TEST`, thực hiện `INSERT` qua service rồi gọi hàm `get_all_*` để xác nhận đọc lại được đúng bản ghi. ID cố định làm cho test có thể chạy lại mà không tạo thêm hàng trùng vì Cassandra thực hiện upsert theo primary key.
 
-File `.env` cục bộ cũng đã được tạo với keyspace `hotel_ks`; token và đường dẫn bundle được để trống để người dùng điền trực tiếp trên máy. `.gitignore` đã loại trừ `.env` và `*.zip`, tránh commit thông tin bí mật.
+File `.env` cục bộ đã được cấu hình để kết nối keyspace `hotel_ks`. `.gitignore` loại trừ `.env` và `*.zip`, nên token và Secure Connect Bundle không nằm trong commit.
 
-Lần chạy hiện tại cho kết quả unit test `OK`; integration test được `skipped` có chủ đích vì chưa có `ASTRA_DB_TOKEN` và `ASTRA_DB_SECURE_BUNDLE_PATH`. QLKS-04 chỉ được xác nhận hoàn thành toàn bộ AC sau khi integration test này chạy thành công trên Astra DB thật.
+Khi chạy trên Python 3.12, `cassandra-driver==3.29.2` cần module tương thích `asyncore`; do đó `requirements.txt` đã bổ sung `pyasyncore==1.0.5` có điều kiện cho Python 3.12 trở lên.
+
+Kết quả kiểm thử cuối cùng: cả 6 unit test và 2 integration test đều đạt (`Ran 8 tests ... OK`). Hai integration test đã kết nối Astra DB thật, insert rồi đọc lại thành công `H_QLKS04_TEST` trong bảng `hotels` và `G_QLKS04_TEST` trong bảng `guests`. QLKS-04 đã đáp ứng đầy đủ Acceptance Criteria và có thể chuyển sang trạng thái **Done**.
 
 ## 3. Kiến trúc và luồng xử lý
 
@@ -263,7 +265,7 @@ Giao diện phụ thuộc internet để tải Tailwind Browser CDN, Google Font
 | Tạo và tra cứu booking | Chưa triển khai |
 | Tạo và xem hóa đơn | Chưa triển khai |
 | Validation và thông báo lỗi | Chưa triển khai |
-| Test tự động | Có 6 unit test đạt; integration test Astra đang chờ cấu hình |
+| Test tự động | 6 unit test và 2 integration test Astra đều đạt |
 | Authentication/authorization | Không có |
 
 Kết luận: ứng dụng hiện là skeleton có dashboard đọc thật từ database và service khách sạn/khách hàng đã có thể đọc, ghi Cassandra. Nếu Astra DB chưa được cấu hình, trang chủ và dashboard vẫn tải được với toàn bộ số liệu bằng 0; các trang nghiệp vụ vẫn chưa có đầy đủ giao diện và xử lý form.
