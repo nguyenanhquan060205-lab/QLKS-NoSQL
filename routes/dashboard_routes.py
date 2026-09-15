@@ -11,10 +11,10 @@ dashboard_bp = Blueprint('dashboard', __name__)
 @dashboard_bp.route('/', methods=['GET'])
 def index():
     """
-    TODO (Như):
-    - Trang chủ giới thiệu về hệ thống Quản lý Khách sạn NoSQL
+    Trang chủ giới thiệu hệ thống + dải số liệu nhanh (lấy chung từ dashboard_service).
     """
-    return render_template('index.html')
+    stats = dashboard_service.get_dashboard_stats()
+    return render_template('index.html', stats=stats)
 
 
 @dashboard_bp.route('/dashboard', methods=['GET'])

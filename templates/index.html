@@ -37,13 +37,23 @@
     </div>
 </div>
 
-<div class="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
-    <div class="flex items-center space-x-3 text-slate-700">
-        <i class="bi bi-code-slash text-2xl text-indigo-600"></i>
-        <div>
-            <h3 class="font-semibold text-base">File: <code class="text-indigo-600">templates/index.html</code></h3>
-            <p class="text-sm text-slate-500 mb-0">Phụ trách: <strong>Như</strong> - Có thể bổ sung thêm tính năng giới thiệu hoặc các thống kê nhanh.</p>
-        </div>
+<!-- DẢI SỐ LIỆU NHANH -->
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+    <div class="bg-white border border-slate-200 rounded-xl p-4 text-center shadow-sm">
+        <p class="text-2xl font-extrabold text-indigo-600">{{ stats.total_hotels }}</p>
+        <p class="text-xs text-slate-500 mt-1">Khách sạn</p>
+    </div>
+    <div class="bg-white border border-slate-200 rounded-xl p-4 text-center shadow-sm">
+        <p class="text-2xl font-extrabold text-cyan-600">{{ stats.total_rooms }}</p>
+        <p class="text-xs text-slate-500 mt-1">Phòng ({{ stats.available_rooms }} trống)</p>
+    </div>
+    <div class="bg-white border border-slate-200 rounded-xl p-4 text-center shadow-sm">
+        <p class="text-2xl font-extrabold text-amber-600">{{ stats.total_bookings }}</p>
+        <p class="text-xs text-slate-500 mt-1">Lượt đặt phòng</p>
+    </div>
+    <div class="bg-white border border-slate-200 rounded-xl p-4 text-center shadow-sm">
+        <p class="text-2xl font-extrabold text-emerald-600">{{ "{:,.0f}".format(stats.total_revenue) }}đ</p>
+        <p class="text-xs text-slate-500 mt-1">Doanh thu</p>
     </div>
 </div>
 {% endblock %}

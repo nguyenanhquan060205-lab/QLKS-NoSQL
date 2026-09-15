@@ -24,17 +24,86 @@
     </span>
 </div>
 
-<div class="bg-slate-50 border-2 border-dashed border-slate-300 rounded-2xl p-8 text-center">
-    <div class="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto mb-3 text-xl">
-        <i class="bi bi-bar-chart"></i>
+<!-- 4 THẺ CARD CHỈ SỐ TỔNG QUAN -->
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+
+    <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm hover:shadow-md transition">
+        <div class="flex items-center justify-between mb-2">
+            <span class="text-sm font-medium text-slate-500">Tổng khách sạn</span>
+            <span class="w-9 h-9 rounded-xl bg-indigo-100 text-indigo-600 flex items-center justify-center">
+                <i class="bi bi-building"></i>
+            </span>
+        </div>
+        <p class="text-3xl font-extrabold text-slate-900">{{ stats.total_hotels }}</p>
     </div>
-    <h3 class="font-semibold text-slate-800 mb-1">Khu vực code của Như</h3>
-    <p class="text-sm text-slate-500 max-w-md mx-auto mb-4">
-        File: <code class="text-indigo-600 font-mono">templates/dashboard.html</code>.<br>
-        Tạo các thẻ card chỉ số thống kê (Grid Tailwind) và nhúng biểu đồ Chart.js trực quan.
-    </p>
+
+    <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm hover:shadow-md transition">
+        <div class="flex items-center justify-between mb-2">
+            <span class="text-sm font-medium text-slate-500">Tổng số phòng</span>
+            <span class="w-9 h-9 rounded-xl bg-cyan-100 text-cyan-600 flex items-center justify-center">
+                <i class="bi bi-door-open"></i>
+            </span>
+        </div>
+        <p class="text-3xl font-extrabold text-slate-900">{{ stats.total_rooms }}</p>
+        <p class="text-xs text-emerald-600 font-medium mt-1">{{ stats.available_rooms }} phòng đang trống</p>
+    </div>
+
+    <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm hover:shadow-md transition">
+        <div class="flex items-center justify-between mb-2">
+            <span class="text-sm font-medium text-slate-500">Lượt đặt phòng</span>
+            <span class="w-9 h-9 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center">
+                <i class="bi bi-calendar-check"></i>
+            </span>
+        </div>
+        <p class="text-3xl font-extrabold text-slate-900">{{ stats.total_bookings }}</p>
+    </div>
+
+    <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm hover:shadow-md transition">
+        <div class="flex items-center justify-between mb-2">
+            <span class="text-sm font-medium text-slate-500">Tổng doanh thu</span>
+            <span class="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center">
+                <i class="bi bi-cash-stack"></i>
+            </span>
+        </div>
+        <p class="text-2xl font-extrabold text-slate-900">
+            {{ "{:,.0f}".format(stats.total_revenue) }} <span class="text-sm font-medium text-slate-400">đ</span>
+        </p>
+    </div>
 </div>
 
-<!-- TODO (Như): Viết các card thống kê và biểu đồ tại đây -->
+<!-- BIỂU ĐỒ TRẠNG THÁI PHÒNG (Chart.js) -->
+<div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+    <h3 class="font-semibold text-slate-800 mb-4">Tỉ lệ phòng trống / đã đặt</h3>
+    {% if stats.total_rooms > 0 %}
+    <div class="max-w-xs mx-auto">
+        <canvas id="roomStatusChart"></canvas>
+    </div>
+    {% else %}
+    <p class="text-sm text-slate-500 text-center py-8">Chưa có dữ liệu phòng để vẽ biểu đồ.</p>
+    {% endif %}
+</div>
 
+{% endblock %}
+
+{% block scripts %}
+{% if stats.total_rooms > 0 %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<script>
+    const ctx = document.getElementById('roomStatusChart');
+    new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: ['Phòng trống', 'Phòng đã đặt'],
+            datasets: [{
+                data: [{{ stats.available_rooms }}, {{ stats.total_rooms - stats.available_rooms }}],
+                backgroundColor: ['#10b981', '#f59e0b'],
+                borderWidth: 0
+            }]
+        },
+        options: {
+            plugins: { legend: { position: 'bottom' } }
+        }
+    });
+</script>
+{% endif %}
 {% endblock %}

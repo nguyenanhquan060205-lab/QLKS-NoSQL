@@ -13,15 +13,9 @@ _session = None
 
 def get_session():
     """
-    TODO (Như):
-    1. Lấy thông tin cấu hình từ file .env:
-       - ASTRA_DB_SECURE_BUNDLE_PATH (đường dẫn tới file secure-connect-*.zip)
-       - ASTRA_DB_TOKEN (Token dạng AstraCS:...)
-       - ASTRA_DB_KEYSPACE (hotel_ks)
-    2. Sử dụng thư viện cassandra-driver để kết nối:
-       from cassandra.cluster import Cluster
-       from cassandra.auth import PlainTextAuthProvider
-    3. Trả về session để các Service thực hiện truy vấn CQL.
+    Kết nối tới AstraDB bằng cassandra-driver, dùng Secure Connect Bundle + Token
+    lấy từ file .env (xem hướng dẫn trong .env.example).
+    Session được cache lại (biến _session) để không phải kết nối lại mỗi request.
     """
     global _session
     if _session is not None:
@@ -31,8 +25,14 @@ def get_session():
     token = os.getenv("ASTRA_DB_TOKEN")
     keyspace = os.getenv("ASTRA_DB_KEYSPACE", "hotel_ks")
 
-    # TODO (Như): Bỏ comment và hoàn thiện đoạn kết nối bên dưới khi có file zip bundle
-    """
+    if not bundle_path or not token:
+        print("⚠️  Chưa cấu hình kết nối AstraDB (thiếu ASTRA_DB_SECURE_BUNDLE_PATH hoặc ASTRA_DB_TOKEN trong .env).")
+        return None
+
+    if not os.path.exists(bundle_path):
+        print(f"❌ Không tìm thấy Secure Connect Bundle tại: {bundle_path}")
+        return None
+
     try:
         from cassandra.cluster import Cluster
         from cassandra.auth import PlainTextAuthProvider
@@ -46,7 +46,10 @@ def get_session():
     except Exception as e:
         print(f"❌ Lỗi kết nối AstraDB: {e}")
         return None
-    """
 
-    print("⚠️  Chưa cấu hình kết nối AstraDB (Đang chạy ở chế độ khung sườn).")
-    return None
+
+if __name__ == "__main__":
+    # Chạy: python database/db.py  ->  để tự test kết nối độc lập (đúng yêu cầu AC của QLKS-02)
+    s = get_session()
+    if s:
+        print("Đã sẵn sàng để truy vấn keyspace hotel_ks.")
