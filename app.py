@@ -25,7 +25,7 @@ from routes.dashboard_routes import dashboard_bp
 app.register_blueprint(dashboard_bp)
 
 if __name__ == '__main__':
-    port = int(os.getenv("PORT", 5000))
+    port = int(os.getenv("PORT", 5050))
     print("=" * 55)
     print("  🏨 HỆ THỐNG QUẢN LÝ KHÁCH SẠN - CASSANDRA / ASTRADB")
     print(f"  🚀 Server đang chạy tại: http://127.0.0.1:{port}")
