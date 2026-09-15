@@ -26,7 +26,7 @@ Kiến trúc hiện tại chia thành ba lớp chính:
 2. `services`: dự kiến chứa nghiệp vụ và truy vấn Cassandra.
 3. `database`: tạo và cache kết nối tới Astra DB.
 
-Phần giao diện dùng Jinja2, Tailwind CSS từ CDN, Bootstrap Icons và Chart.js. Cấu trúc tổng thể khá rõ ràng cho một đồ án nhóm. Sau QLKS-04 và QLKS-05, tầng service đã có thể thêm và đọc khách sạn, khách hàng và phòng; tuy nhiên các route POST và giao diện tương ứng vẫn là placeholder. Phần đặt phòng và hóa đơn vẫn chủ yếu dừng ở khung sườn.
+Phần giao diện dùng Jinja2, Tailwind CSS từ CDN, Bootstrap Icons và Chart.js. Cấu trúc tổng thể khá rõ ràng cho một đồ án nhóm. Sau QLKS-04 và QLKS-05, tầng service đã có thể thêm và đọc khách sạn, khách hàng và phòng. QLKS-06 đã nối service khách sạn/khách hàng vào route và hoàn thiện hai giao diện tương ứng. Phần giao diện phòng, đặt phòng và hóa đơn vẫn chủ yếu dừng ở khung sườn.
 
 ## Task 4: service khách sạn và khách hàng
 
@@ -147,6 +147,42 @@ Primary key của bảng là `(hotel_id, room_number)`, trong đó `hotel_id` l�
 
 Kết quả cuối: 4 unit test QLKS-05 và 1 integration test Astra đều đạt. Toàn bộ test suite của dự án hiện có 13 test và tất cả đều `OK`. QLKS-05 đáp ứng đầy đủ Acceptance Criteria và có thể chuyển sang trạng thái **Done**.
 
+## Task 6: route và giao diện khách sạn/khách hàng
+
+### Yêu cầu
+
+Hoàn thiện route Flask và form thêm/bảng danh sách trong `hotels.html`, `guests.html` bằng Tailwind CSS.
+
+Acceptance Criteria: người dùng thêm được khách sạn và khách hàng mới trực tiếp trên web.
+
+### Route đã triển khai
+
+- `GET /hotels` và `GET /guests` lấy Cassandra Row từ service rồi truyền cho template cùng trạng thái form rỗng.
+- `POST /hotels/add` đọc sáu trường, kiểm tra năm trường bắt buộc, tự sinh `hotel_id` dạng `H` + 8 ký tự hex và gọi `create_hotel`.
+- `POST /guests/add` đọc bốn trường, kiểm tra trường bắt buộc/định dạng email, tự sinh `guest_id` dạng `G` + 8 ký tự hex và gọi `create_guest`.
+- Thành công dùng POST/Redirect/GET và flash message; validation lỗi trả HTTP 400, giữ dữ liệu đã nhập; lỗi ghi database trả HTTP 503 cùng hướng xử lý rõ ràng.
+
+### Giao diện đã triển khai
+
+- Hai trang dùng bố cục mobile-first: form và bảng xếp dọc trên màn hình nhỏ, chia hai cột trên desktop.
+- Form có label liên kết với input, required marker, semantic input type, autocomplete, input mode và lỗi ngay dưới trường.
+- Nút chính và nút thao tác có vùng bấm tối thiểu 44px, focus ring bàn phím, hover state và `motion-reduce`.
+- Khi submit, nút chuyển sang trạng thái “Đang thêm…” và bị vô hiệu hóa để tránh ghi trùng trong lúc chờ Astra DB.
+- Bảng được bọc `overflow-x-auto`, có empty state và hành động quay lại form.
+- Danh sách khách sạn hiển thị tiện nghi và nút “Xem phòng”; danh sách khách hàng có liên kết email/điện thoại và nút “Lịch sử”.
+- `base.html` có vùng flash message `aria-live`, icon kèm nội dung để không phụ thuộc màu, skip link và trạng thái `aria-expanded` cho menu mobile.
+
+### Kiểm thử QLKS-06
+
+`tests/test_hotel_routes.py` có bảy test kiểm tra render dữ liệu, gọi service đúng tham số, ID sinh tự động, redirect/flash, validation và lỗi database.
+
+`tests/test_hotel_routes_integration.py` có hai test gửi HTTP POST thật qua Flask test client rồi truy vấn Astra để xác nhận dữ liệu. Test đã tạo/upsert:
+
+- Khách sạn `H06060606` — `QLKS-06 Web Test Hotel`.
+- Khách hàng `G07070707` — `QLKS-06 Web Test Guest`.
+
+Cả 7 route test và 2 integration test đều đạt. Toàn bộ test suite sau QLKS-06 có 22 test và tất cả đều `OK`. QLKS-06 đáp ứng đầy đủ Acceptance Criteria và có thể chuyển sang trạng thái **Done**.
+
 ## 3. Kiến trúc và luồng xử lý
 
 Luồng request đi qua các thành phần như sau:
@@ -196,19 +232,19 @@ Cách cache này phù hợp với ứng dụng demo vì Cassandra `Session` đư
 |---|---|---|---|
 | GET | `/` | Trang chủ và số liệu nhanh | Có hoạt động |
 | GET | `/dashboard` | Dashboard và biểu đồ phòng | Có hoạt động |
-| GET | `/hotels` | Danh sách khách sạn | Service đã đọc DB; template chưa render danh sách |
-| POST | `/hotels/add` | Thêm khách sạn | Service đã có; route chưa xử lý form |
+| GET | `/hotels` | Danh sách khách sạn | Hoàn thiện |
+| POST | `/hotels/add` | Thêm khách sạn | Hoàn thiện và test Astra qua web |
 | GET | `/hotels/<hotel_id>/rooms` | Phòng theo khách sạn, Q1 | Route có, service trả rỗng |
 | POST | `/hotels/<hotel_id>/rooms/add` | Thêm phòng | Chưa xử lý form |
-| GET | `/guests` | Danh sách khách hàng | Service đã đọc DB; template chưa render danh sách |
-| POST | `/guests/add` | Thêm khách hàng | Service đã có; route chưa xử lý form |
+| GET | `/guests` | Danh sách khách hàng | Hoàn thiện |
+| POST | `/guests/add` | Thêm khách hàng | Hoàn thiện và test Astra qua web |
 | GET | `/bookings` | Danh sách đặt phòng | Luôn truyền danh sách rỗng |
 | POST | `/bookings/create` | Tạo đặt phòng bằng batch, Q5 | Chưa xử lý form/chưa gọi service |
 | GET | `/bookings/guest/<guest_id>` | Lịch sử theo khách, Q2 | Route có, service trả rỗng |
 | GET | `/bookings/hotel-date` | Đặt phòng theo khách sạn và ngày, Q3 | Route có, service trả rỗng |
 | GET | `/invoices/<booking_id>` | Hóa đơn theo booking, Q4 | Route có, service trả `None` |
 
-Các POST route hiện chỉ redirect, không đọc `request.form`, không gọi service và không hiển thị thông báo thành công/thất bại. `flash` được import ở hai module route nhưng chưa được sử dụng.
+Hai POST route khách sạn/khách hàng đã xử lý `request.form`, validation, gọi service và flash message. Các POST route phòng và booking vẫn chỉ redirect, chưa thực thi nghiệp vụ.
 
 ### 3.4. Lớp service
 
@@ -281,9 +317,9 @@ Hai bản ghi booking thuộc hai partition khác nhau: một partition theo `gu
 - `static/css/style.css`: bảo đảm footer nằm cuối trang bằng flex layout.
 - `static/js/main.js`: hiện chỉ log trạng thái; menu mobile được xử lý inline trong `base.html`.
 
-### 5.2. Thành phần chưa hoàn thiện
+### 5.2. Thành phần nghiệp vụ
 
-Các file `hotels.html`, `rooms.html`, `guests.html`, `bookings.html` và `invoices.html` mới hiển thị khung thông báo vị trí cần code. Chúng chưa có:
+`hotels.html` và `guests.html` đã có form, bảng dữ liệu, empty state, validation và flash feedback. Các file `rooms.html`, `bookings.html` và `invoices.html` vẫn mới hiển thị khung thông báo vị trí cần code. Chúng chưa có:
 
 - Form nhập liệu.
 - Bảng lặp qua dữ liệu Jinja.
@@ -303,15 +339,15 @@ Giao diện phụ thuộc internet để tải Tailwind Browser CDN, Google Font
 | Trang chủ | Hoàn thiện ở mức demo |
 | Dashboard | Có logic và giao diện |
 | Service liệt kê/thêm khách sạn | Đã triển khai và có unit test |
-| Route/template khách sạn | Chưa hoàn thiện |
+| Route/template khách sạn | Đã hoàn thiện và test qua web |
 | Service liệt kê/thêm phòng theo khách sạn | Đã triển khai và test Astra |
 | Route/template phòng | Chưa hoàn thiện |
 | Service liệt kê/thêm khách hàng | Đã triển khai và có unit test |
-| Route/template khách hàng | Chưa hoàn thiện |
+| Route/template khách hàng | Đã hoàn thiện và test qua web |
 | Tạo và tra cứu booking | Chưa triển khai |
 | Tạo và xem hóa đơn | Chưa triển khai |
-| Validation và thông báo lỗi | Chưa triển khai |
-| Test tự động | 10 unit test và 3 integration test Astra đều đạt |
+| Validation và thông báo lỗi | Đã có cho khách sạn/khách hàng |
+| Test tự động | 17 unit/route test và 5 integration test Astra đều đạt |
 | Authentication/authorization | Không có |
 
 Kết luận: ứng dụng hiện là skeleton có dashboard đọc thật từ database và service khách sạn/khách hàng đã có thể đọc, ghi Cassandra. Nếu Astra DB chưa được cấu hình, trang chủ và dashboard vẫn tải được với toàn bộ số liệu bằng 0; các trang nghiệp vụ vẫn chưa có đầy đủ giao diện và xử lý form.
@@ -320,7 +356,7 @@ Kết luận: ứng dụng hiện là skeleton có dashboard đọc thật từ 
 
 ### Mức cao
 
-1. **Nhiều chức năng cốt lõi chưa hoạt động.** Service booking/invoice vẫn là stub, các POST route không xử lý dữ liệu và năm template nghiệp vụ là placeholder. Service khách sạn, khách hàng và phòng đã hoàn thành qua QLKS-04/05.
+1. **Nhiều chức năng cốt lõi chưa hoạt động.** Service booking/invoice và POST route phòng vẫn là stub; ba template phòng/booking/invoice là placeholder. Khách sạn và khách hàng đã hoàn thiện service, route và giao diện qua QLKS-04/06.
 2. **Không có kiểm tra xung đột lịch phòng.** Cờ `is_available` không phụ thuộc ngày, nên thiết kế hiện tại có thể nhận nhiều booking trùng phòng và trùng khoảng thời gian.
 3. **Cấu hình chạy không an toàn khi triển khai.** `app.secret_key` có giá trị fallback cố định và `app.run(debug=True)` luôn bật debug, không sử dụng `FLASK_DEBUG` trong `.env.example`.
 
@@ -334,16 +370,15 @@ Kết luận: ứng dụng hiện là skeleton có dashboard đọc thật từ 
 
 ### Mức thấp
 
-1. `flash` được import nhưng chưa dùng.
-2. `USE_MOCK=true` được khai báo trong `.env.example` nhưng không có code đọc biến này.
-3. `FLASK_DEBUG=true` được khai báo nhưng cũng không được đọc.
-4. `main.js` gần như chưa có logic; menu mobile đặt inline trong template thay vì gom vào file JS chung.
-5. URL trong template được hard-code (`/hotels`, `/bookings`, ...) thay vì dùng `url_for`, làm giảm khả năng đổi route/prefix.
+1. `USE_MOCK=true` được khai báo trong `.env.example` nhưng không có code đọc biến này.
+2. `FLASK_DEBUG=true` được khai báo nhưng cũng không được đọc.
+3. `main.js` gần như chưa có logic; menu mobile đặt inline trong template thay vì gom vào file JS chung.
+4. Một số URL cũ trong `base.html` vẫn được hard-code thay vì dùng `url_for`, làm giảm khả năng đổi route/prefix.
 
 ## 8. Thứ tự hoàn thiện được đề xuất
 
 1. Hoàn thiện các hàm trong `booking_service.py`, tiếp tục ưu tiên prepared statements và query theo partition key.
-2. Hoàn thiện POST routes cho khách sạn/khách hàng/phòng: parse form, validate, gọi service QLKS-04/05 và dùng flash message.
+2. Hoàn thiện POST route và template phòng bằng service QLKS-05; khách sạn/khách hàng đã hoàn tất ở QLKS-06.
 3. Hoàn thiện năm template nghiệp vụ với form, bảng dữ liệu, trạng thái rỗng và lỗi.
 4. Thiết kế cơ chế kiểm tra phòng trống theo khoảng ngày trước khi cho phép tạo booking.
 5. Quyết định quy tắc đồng bộ khi tạo, cập nhật hoặc hủy booking giữa các bảng phi chuẩn hóa.
@@ -353,6 +388,6 @@ Kết luận: ứng dụng hiện là skeleton có dashboard đọc thật từ 
 
 ## 9. Kết luận
 
-Mã nguồn có cách chia module dễ hiểu và thể hiện đúng ý tưởng query-first/denormalization của Cassandra. Schema đã hỗ trợ trực tiếp các truy vấn Q1-Q4, còn Q5 được định hướng bằng batch ghi hai bảng. QLKS-04 đã hoàn thiện service `hotels`/`guests`, QLKS-05 đã hoàn thiện Query Q1 và service `rooms_by_hotel`. Dự án vẫn chưa phải một hệ thống quản lý khách sạn hoàn chỉnh vì route, giao diện và các nghiệp vụ booking/invoice còn TODO.
+Mã nguồn có cách chia module dễ hiểu và thể hiện đúng ý tưởng query-first/denormalization của Cassandra. Schema đã hỗ trợ trực tiếp các truy vấn Q1-Q4, còn Q5 được định hướng bằng batch ghi hai bảng. QLKS-04 đã hoàn thiện service `hotels`/`guests`, QLKS-05 đã hoàn thiện Query Q1 và service `rooms_by_hotel`, QLKS-06 đã hoàn thiện luồng web khách sạn/khách hàng. Dự án vẫn chưa hoàn chỉnh vì giao diện phòng và các nghiệp vụ booking/invoice còn TODO.
 
-Ưu tiên tiếp theo là nối các service QLKS-04/05 vào route/template, hoàn thiện service booking, sau đó xử lý bài toán phòng trống theo khoảng ngày. Nếu chỉ điền các câu CQL đang comment mà không bổ sung kiểm tra lịch và cơ chế đồng bộ dữ liệu phi chuẩn hóa, ứng dụng có thể chạy nhưng vẫn dễ phát sinh booking trùng và dữ liệu không nhất quán.
+Ưu tiên tiếp theo là nối service phòng QLKS-05 vào route/template, hoàn thiện service booking, sau đó xử lý bài toán phòng trống theo khoảng ngày. Nếu chỉ điền các câu CQL đang comment mà không bổ sung kiểm tra lịch và cơ chế đồng bộ dữ liệu phi chuẩn hóa, ứng dụng có thể chạy nhưng vẫn dễ phát sinh booking trùng và dữ liệu không nhất quán.

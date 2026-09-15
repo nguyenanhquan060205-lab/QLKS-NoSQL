@@ -1,41 +1,131 @@
 {% extends "base.html" %}
 
-{% block title %}Danh Sách Khách Sạn - Phụ trách: Định{% endblock %}
+{% block title %}Quản lý Khách sạn - QLKS NoSQL{% endblock %}
 
 {% block content %}
-<!-- ================================================================
-     PHỤ TRÁCH: ĐỊNH (Quản lý Khách sạn)
-     Bảng dữ liệu: hotels (hotel_id, name, phone, address, city, country, amenities)
-     
-     TODO (Định):
-     1. Form thêm mới Khách sạn (POST về /hotels/add)
-     2. Bảng hiển thị danh sách khách sạn (lặp qua biến `hotels`)
-     3. Nút bấm "Xem danh sách phòng" dẫn tới /hotels/{hotel_id}/rooms (Query Q1)
-================================================================ -->
-
-<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-    <div>
-        <h1 class="text-2xl font-bold text-slate-900 flex items-center gap-2">
-            <span>🏨</span> Quản Lý Khách Sạn
-        </h1>
-        <p class="text-sm text-slate-500 mt-1">Dữ liệu từ bảng <code class="text-cyan-600 bg-cyan-50 px-1.5 py-0.5 rounded">hotels</code></p>
+<section aria-labelledby="hotels-heading">
+    <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between mb-6">
+        <div>
+            <p class="text-sm font-semibold uppercase tracking-wider text-cyan-700">QLKS-06 · Khách sạn</p>
+            <h1 id="hotels-heading" class="mt-1 flex items-center gap-3 text-2xl sm:text-3xl font-bold text-slate-950">
+                <span class="flex h-11 w-11 items-center justify-center rounded-xl bg-cyan-100 text-cyan-700" aria-hidden="true"><i class="bi bi-buildings"></i></span>
+                Quản lý khách sạn
+            </h1>
+            <p class="mt-2 text-sm sm:text-base text-slate-600">Thêm cơ sở mới và truy cập danh sách phòng theo từng khách sạn.</p>
+        </div>
+        <div class="inline-flex w-fit items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm">
+            <span class="h-2.5 w-2.5 rounded-full bg-emerald-500" aria-hidden="true"></span>
+            {{ hotels|length }} khách sạn
+        </div>
     </div>
-    <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-cyan-100 text-cyan-800 border border-cyan-200">
-        Phụ trách: Định
-    </span>
-</div>
 
-<div class="bg-slate-50 border-2 border-dashed border-slate-300 rounded-2xl p-8 text-center">
-    <div class="w-12 h-12 rounded-full bg-cyan-100 text-cyan-600 flex items-center justify-center mx-auto mb-3 text-xl">
-        <i class="bi bi-code-square"></i>
+    <div class="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,360px)_minmax(0,1fr)] lg:items-start">
+        <aside id="hotel-form" class="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-sm lg:sticky lg:top-24">
+            <div class="mb-5">
+                <h2 class="text-lg font-semibold text-slate-950">Thêm khách sạn</h2>
+                <p class="mt-1 text-sm text-slate-500">Mã khách sạn sẽ được hệ thống tạo tự động.</p>
+            </div>
+
+            <form action="{{ url_for('hotel.add_hotel') }}" method="post" class="space-y-4" data-submit-form>
+                <div>
+                    <label for="hotel-name" class="block text-sm font-medium text-slate-700">Tên khách sạn <span class="text-red-600" aria-hidden="true">*</span></label>
+                    <input id="hotel-name" name="name" type="text" required maxlength="150" autocomplete="organization" value="{{ form_data.get('name', '') }}" aria-describedby="hotel-name-error" class="mt-1.5 min-h-11 w-full rounded-xl border {% if errors.get('name') %}border-red-400 bg-red-50{% else %}border-slate-300 bg-white{% endif %} px-3.5 py-2.5 text-slate-900 outline-none transition placeholder:text-slate-400 focus-visible:border-cyan-600 focus-visible:ring-2 focus-visible:ring-cyan-200 motion-reduce:transition-none" placeholder="Ví dụ: Ocean View Hotel">
+                    {% if errors.get('name') %}<p id="hotel-name-error" class="mt-1.5 text-sm text-red-600">{{ errors.name }}</p>{% endif %}
+                </div>
+
+                <div>
+                    <label for="hotel-phone" class="block text-sm font-medium text-slate-700">Số điện thoại <span class="text-red-600" aria-hidden="true">*</span></label>
+                    <input id="hotel-phone" name="phone" type="tel" required maxlength="20" inputmode="tel" autocomplete="tel" value="{{ form_data.get('phone', '') }}" aria-describedby="hotel-phone-error" class="mt-1.5 min-h-11 w-full rounded-xl border {% if errors.get('phone') %}border-red-400 bg-red-50{% else %}border-slate-300 bg-white{% endif %} px-3.5 py-2.5 text-slate-900 outline-none transition placeholder:text-slate-400 focus-visible:border-cyan-600 focus-visible:ring-2 focus-visible:ring-cyan-200 motion-reduce:transition-none" placeholder="0901 234 567">
+                    {% if errors.get('phone') %}<p id="hotel-phone-error" class="mt-1.5 text-sm text-red-600">{{ errors.phone }}</p>{% endif %}
+                </div>
+
+                <div>
+                    <label for="hotel-address" class="block text-sm font-medium text-slate-700">Địa chỉ <span class="text-red-600" aria-hidden="true">*</span></label>
+                    <input id="hotel-address" name="address" type="text" required maxlength="255" autocomplete="street-address" value="{{ form_data.get('address', '') }}" aria-describedby="hotel-address-error" class="mt-1.5 min-h-11 w-full rounded-xl border {% if errors.get('address') %}border-red-400 bg-red-50{% else %}border-slate-300 bg-white{% endif %} px-3.5 py-2.5 text-slate-900 outline-none transition placeholder:text-slate-400 focus-visible:border-cyan-600 focus-visible:ring-2 focus-visible:ring-cyan-200 motion-reduce:transition-none" placeholder="Số nhà, tên đường">
+                    {% if errors.get('address') %}<p id="hotel-address-error" class="mt-1.5 text-sm text-red-600">{{ errors.address }}</p>{% endif %}
+                </div>
+
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+                    <div>
+                        <label for="hotel-city" class="block text-sm font-medium text-slate-700">Thành phố <span class="text-red-600" aria-hidden="true">*</span></label>
+                        <input id="hotel-city" name="city" type="text" required maxlength="100" autocomplete="address-level2" value="{{ form_data.get('city', '') }}" aria-describedby="hotel-city-error" class="mt-1.5 min-h-11 w-full rounded-xl border {% if errors.get('city') %}border-red-400 bg-red-50{% else %}border-slate-300 bg-white{% endif %} px-3.5 py-2.5 text-slate-900 outline-none transition focus-visible:border-cyan-600 focus-visible:ring-2 focus-visible:ring-cyan-200 motion-reduce:transition-none" placeholder="Đà Nẵng">
+                        {% if errors.get('city') %}<p id="hotel-city-error" class="mt-1.5 text-sm text-red-600">{{ errors.city }}</p>{% endif %}
+                    </div>
+                    <div>
+                        <label for="hotel-country" class="block text-sm font-medium text-slate-700">Quốc gia <span class="text-red-600" aria-hidden="true">*</span></label>
+                        <input id="hotel-country" name="country" type="text" required maxlength="100" autocomplete="country-name" value="{{ form_data.get('country', 'Vietnam') }}" aria-describedby="hotel-country-error" class="mt-1.5 min-h-11 w-full rounded-xl border {% if errors.get('country') %}border-red-400 bg-red-50{% else %}border-slate-300 bg-white{% endif %} px-3.5 py-2.5 text-slate-900 outline-none transition focus-visible:border-cyan-600 focus-visible:ring-2 focus-visible:ring-cyan-200 motion-reduce:transition-none">
+                        {% if errors.get('country') %}<p id="hotel-country-error" class="mt-1.5 text-sm text-red-600">{{ errors.country }}</p>{% endif %}
+                    </div>
+                </div>
+
+                <div>
+                    <label for="hotel-amenities" class="block text-sm font-medium text-slate-700">Tiện nghi</label>
+                    <input id="hotel-amenities" name="amenities" type="text" maxlength="300" value="{{ form_data.get('amenities', '') }}" class="mt-1.5 min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-slate-900 outline-none transition placeholder:text-slate-400 focus-visible:border-cyan-600 focus-visible:ring-2 focus-visible:ring-cyan-200 motion-reduce:transition-none" placeholder="Wifi, Hồ bơi, Bãi đỗ xe">
+                    <p class="mt-1.5 text-xs leading-5 text-slate-500">Phân tách mỗi tiện nghi bằng dấu phẩy.</p>
+                </div>
+
+                <button type="submit" class="inline-flex min-h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-cyan-700 px-4 py-2.5 font-semibold text-white shadow-sm transition hover:bg-cyan-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-600 focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-60 motion-reduce:transition-none" data-submit-button data-submitting-text="Đang thêm khách sạn...">
+                    <i class="bi bi-plus-lg" aria-hidden="true"></i>
+                    Thêm khách sạn
+                </button>
+            </form>
+        </aside>
+
+        <div class="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <div class="border-b border-slate-200 px-5 py-4 sm:px-6">
+                <h2 class="font-semibold text-slate-950">Danh sách khách sạn</h2>
+                <p class="mt-0.5 text-sm text-slate-500">Dữ liệu từ bảng Cassandra <code class="text-cyan-700">hotels</code>.</p>
+            </div>
+
+            {% if hotels %}
+                <div class="overflow-x-auto">
+                    <table class="w-full min-w-[820px] text-left text-sm">
+                        <thead class="bg-slate-50 text-xs uppercase tracking-wider text-slate-500">
+                            <tr>
+                                <th scope="col" class="px-5 py-3.5 sm:px-6">Khách sạn</th>
+                                <th scope="col" class="px-5 py-3.5">Liên hệ</th>
+                                <th scope="col" class="px-5 py-3.5">Địa điểm</th>
+                                <th scope="col" class="px-5 py-3.5">Tiện nghi</th>
+                                <th scope="col" class="px-5 py-3.5 text-right sm:px-6">Thao tác</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            {% for hotel in hotels %}
+                                <tr class="align-top transition hover:bg-slate-50/80 motion-reduce:transition-none">
+                                    <td class="px-5 py-4 sm:px-6">
+                                        <p class="font-semibold text-slate-900">{{ hotel.name }}</p>
+                                        <p class="mt-1 font-mono text-xs text-slate-500">{{ hotel.hotel_id }}</p>
+                                    </td>
+                                    <td class="px-5 py-4"><a href="tel:{{ hotel.phone }}" class="text-slate-700 hover:text-cyan-700 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500">{{ hotel.phone }}</a></td>
+                                    <td class="px-5 py-4 text-slate-600"><p>{{ hotel.address }}</p><p class="mt-1 text-xs">{{ hotel.city }}, {{ hotel.country }}</p></td>
+                                    <td class="px-5 py-4">
+                                        {% if hotel.amenities %}
+                                            <div class="flex max-w-xs flex-wrap gap-1.5">
+                                                {% for amenity in hotel.amenities|sort %}<span class="rounded-full bg-cyan-50 px-2.5 py-1 text-xs font-medium text-cyan-800">{{ amenity }}</span>{% endfor %}
+                                            </div>
+                                        {% else %}
+                                            <span class="text-xs text-slate-400">Chưa cập nhật</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="px-5 py-4 text-right sm:px-6">
+                                        <a href="{{ url_for('hotel.list_rooms', hotel_id=hotel.hotel_id) }}" class="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-cyan-200 bg-cyan-50 px-3.5 py-2 font-semibold text-cyan-800 transition hover:border-cyan-300 hover:bg-cyan-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 motion-reduce:transition-none">
+                                            <i class="bi bi-door-open" aria-hidden="true"></i> Xem phòng
+                                        </a>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="px-6 py-14 text-center">
+                    <span class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-500" aria-hidden="true"><i class="bi bi-building-add"></i></span>
+                    <h3 class="mt-4 font-semibold text-slate-900">Chưa có khách sạn</h3>
+                    <p class="mx-auto mt-1 max-w-sm text-sm text-slate-500">Thêm khách sạn đầu tiên để bắt đầu quản lý phòng và đặt chỗ.</p>
+                    <a href="#hotel-form" class="mt-4 inline-flex min-h-11 items-center rounded-lg px-3 font-semibold text-cyan-700 hover:bg-cyan-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500">Đi tới biểu mẫu</a>
+                </div>
+            {% endif %}
+        </div>
     </div>
-    <h3 class="font-semibold text-slate-800 mb-1">Khu vực code của Định</h3>
-    <p class="text-sm text-slate-500 max-w-md mx-auto mb-4">
-        File: <code class="text-indigo-600 font-mono">templates/hotels.html</code>.<br>
-        Sử dụng Tailwind CSS (các class: <code class="text-xs bg-slate-200 px-1 py-0.5 rounded">table</code>, <code class="text-xs bg-slate-200 px-1 py-0.5 rounded">bg-white</code>, <code class="text-xs bg-slate-200 px-1 py-0.5 rounded">rounded-xl</code>, <code class="text-xs bg-slate-200 px-1 py-0.5 rounded">shadow-sm</code>) để dựng Form thêm khách sạn và Bảng danh sách.
-    </p>
-</div>
-
-<!-- TODO (Định): Viết Form thêm khách sạn và Bảng hiển thị tại đây -->
-
+</section>
 {% endblock %}

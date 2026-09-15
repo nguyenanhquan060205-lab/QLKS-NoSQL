@@ -1,41 +1,107 @@
 {% extends "base.html" %}
 
-{% block title %}Quản Lý Khách Hàng - Phụ trách: Định{% endblock %}
+{% block title %}Quản lý Khách hàng - QLKS NoSQL{% endblock %}
 
 {% block content %}
-<!-- ================================================================
-     PHỤ TRÁCH: ĐỊNH (Quản lý Khách hàng)
-     Bảng dữ liệu: guests (guest_id, full_name, email, phone, id_card)
-     
-     TODO (Định):
-     1. Form thêm mới khách hàng (POST về /guests/add)
-     2. Bảng hiển thị danh sách khách hàng (lặp qua biến `guests`)
-     3. Nút bấm xem lịch sử đặt phòng dẫn sang: /bookings/guest/{guest_id} (gọi chức năng Query Q2 của Quân)
-================================================================ -->
-
-<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-    <div>
-        <h1 class="text-2xl font-bold text-slate-900 flex items-center gap-2">
-            <span>👤</span> Quản Lý Khách Hàng
-        </h1>
-        <p class="text-sm text-slate-500 mt-1">Dữ liệu từ bảng <code class="text-cyan-600 bg-cyan-50 px-1.5 py-0.5 rounded">guests</code></p>
+<section aria-labelledby="guests-heading">
+    <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between mb-6">
+        <div>
+            <p class="text-sm font-semibold uppercase tracking-wider text-cyan-700">QLKS-06 · Khách hàng</p>
+            <h1 id="guests-heading" class="mt-1 flex items-center gap-3 text-2xl sm:text-3xl font-bold text-slate-950">
+                <span class="flex h-11 w-11 items-center justify-center rounded-xl bg-cyan-100 text-cyan-700" aria-hidden="true"><i class="bi bi-people"></i></span>
+                Quản lý khách hàng
+            </h1>
+            <p class="mt-2 text-sm sm:text-base text-slate-600">Lưu hồ sơ khách lưu trú và truy cập nhanh lịch sử đặt phòng.</p>
+        </div>
+        <div class="inline-flex w-fit items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm">
+            <span class="h-2.5 w-2.5 rounded-full bg-emerald-500" aria-hidden="true"></span>
+            {{ guests|length }} khách hàng
+        </div>
     </div>
-    <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-cyan-100 text-cyan-800 border border-cyan-200">
-        Phụ trách: Định
-    </span>
-</div>
 
-<div class="bg-slate-50 border-2 border-dashed border-slate-300 rounded-2xl p-8 text-center">
-    <div class="w-12 h-12 rounded-full bg-cyan-100 text-cyan-600 flex items-center justify-center mx-auto mb-3 text-xl">
-        <i class="bi bi-people"></i>
+    <div class="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,360px)_minmax(0,1fr)] lg:items-start">
+        <aside id="guest-form" class="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-sm lg:sticky lg:top-24">
+            <div class="mb-5">
+                <h2 class="text-lg font-semibold text-slate-950">Thêm khách hàng</h2>
+                <p class="mt-1 text-sm text-slate-500">Mã khách hàng sẽ được hệ thống tạo tự động.</p>
+            </div>
+
+            <form action="{{ url_for('hotel.add_guest') }}" method="post" class="space-y-4" data-submit-form>
+                <div>
+                    <label for="guest-name" class="block text-sm font-medium text-slate-700">Họ và tên <span class="text-red-600" aria-hidden="true">*</span></label>
+                    <input id="guest-name" name="full_name" type="text" required maxlength="150" autocomplete="name" value="{{ form_data.get('full_name', '') }}" aria-describedby="guest-name-error" class="mt-1.5 min-h-11 w-full rounded-xl border {% if errors.get('full_name') %}border-red-400 bg-red-50{% else %}border-slate-300 bg-white{% endif %} px-3.5 py-2.5 text-slate-900 outline-none transition placeholder:text-slate-400 focus-visible:border-cyan-600 focus-visible:ring-2 focus-visible:ring-cyan-200 motion-reduce:transition-none" placeholder="Nguyễn Văn An">
+                    {% if errors.get('full_name') %}<p id="guest-name-error" class="mt-1.5 text-sm text-red-600">{{ errors.full_name }}</p>{% endif %}
+                </div>
+
+                <div>
+                    <label for="guest-email" class="block text-sm font-medium text-slate-700">Email <span class="text-red-600" aria-hidden="true">*</span></label>
+                    <input id="guest-email" name="email" type="email" required maxlength="254" inputmode="email" autocomplete="email" value="{{ form_data.get('email', '') }}" aria-describedby="guest-email-error" class="mt-1.5 min-h-11 w-full rounded-xl border {% if errors.get('email') %}border-red-400 bg-red-50{% else %}border-slate-300 bg-white{% endif %} px-3.5 py-2.5 text-slate-900 outline-none transition placeholder:text-slate-400 focus-visible:border-cyan-600 focus-visible:ring-2 focus-visible:ring-cyan-200 motion-reduce:transition-none" placeholder="an@example.com">
+                    {% if errors.get('email') %}<p id="guest-email-error" class="mt-1.5 text-sm text-red-600">{{ errors.email }}</p>{% endif %}
+                </div>
+
+                <div>
+                    <label for="guest-phone" class="block text-sm font-medium text-slate-700">Số điện thoại <span class="text-red-600" aria-hidden="true">*</span></label>
+                    <input id="guest-phone" name="phone" type="tel" required maxlength="20" inputmode="tel" autocomplete="tel" value="{{ form_data.get('phone', '') }}" aria-describedby="guest-phone-error" class="mt-1.5 min-h-11 w-full rounded-xl border {% if errors.get('phone') %}border-red-400 bg-red-50{% else %}border-slate-300 bg-white{% endif %} px-3.5 py-2.5 text-slate-900 outline-none transition placeholder:text-slate-400 focus-visible:border-cyan-600 focus-visible:ring-2 focus-visible:ring-cyan-200 motion-reduce:transition-none" placeholder="0901 234 567">
+                    {% if errors.get('phone') %}<p id="guest-phone-error" class="mt-1.5 text-sm text-red-600">{{ errors.phone }}</p>{% endif %}
+                </div>
+
+                <div>
+                    <label for="guest-id-card" class="block text-sm font-medium text-slate-700">CCCD/Hộ chiếu <span class="text-red-600" aria-hidden="true">*</span></label>
+                    <input id="guest-id-card" name="id_card" type="text" required maxlength="30" value="{{ form_data.get('id_card', '') }}" aria-describedby="guest-id-card-error" class="mt-1.5 min-h-11 w-full rounded-xl border {% if errors.get('id_card') %}border-red-400 bg-red-50{% else %}border-slate-300 bg-white{% endif %} px-3.5 py-2.5 text-slate-900 outline-none transition placeholder:text-slate-400 focus-visible:border-cyan-600 focus-visible:ring-2 focus-visible:ring-cyan-200 motion-reduce:transition-none" placeholder="079201001234 hoặc B1234567">
+                    {% if errors.get('id_card') %}<p id="guest-id-card-error" class="mt-1.5 text-sm text-red-600">{{ errors.id_card }}</p>{% endif %}
+                </div>
+
+                <button type="submit" class="inline-flex min-h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-cyan-700 px-4 py-2.5 font-semibold text-white shadow-sm transition hover:bg-cyan-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-600 focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-60 motion-reduce:transition-none" data-submit-button data-submitting-text="Đang thêm khách hàng...">
+                    <i class="bi bi-person-plus" aria-hidden="true"></i>
+                    Thêm khách hàng
+                </button>
+            </form>
+        </aside>
+
+        <div class="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <div class="border-b border-slate-200 px-5 py-4 sm:px-6">
+                <h2 class="font-semibold text-slate-950">Danh sách khách hàng</h2>
+                <p class="mt-0.5 text-sm text-slate-500">Dữ liệu từ bảng Cassandra <code class="text-cyan-700">guests</code>.</p>
+            </div>
+
+            {% if guests %}
+                <div class="overflow-x-auto">
+                    <table class="w-full min-w-[760px] text-left text-sm">
+                        <thead class="bg-slate-50 text-xs uppercase tracking-wider text-slate-500">
+                            <tr>
+                                <th scope="col" class="px-5 py-3.5 sm:px-6">Khách hàng</th>
+                                <th scope="col" class="px-5 py-3.5">Email</th>
+                                <th scope="col" class="px-5 py-3.5">Điện thoại</th>
+                                <th scope="col" class="px-5 py-3.5">CCCD/Hộ chiếu</th>
+                                <th scope="col" class="px-5 py-3.5 text-right sm:px-6">Thao tác</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            {% for guest in guests %}
+                                <tr class="transition hover:bg-slate-50/80 motion-reduce:transition-none">
+                                    <td class="px-5 py-4 sm:px-6"><p class="font-semibold text-slate-900">{{ guest.full_name }}</p><p class="mt-1 font-mono text-xs text-slate-500">{{ guest.guest_id }}</p></td>
+                                    <td class="px-5 py-4"><a href="mailto:{{ guest.email }}" class="text-slate-700 hover:text-cyan-700 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500">{{ guest.email }}</a></td>
+                                    <td class="px-5 py-4"><a href="tel:{{ guest.phone }}" class="text-slate-700 hover:text-cyan-700 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500">{{ guest.phone }}</a></td>
+                                    <td class="px-5 py-4 font-mono text-slate-600">{{ guest.id_card }}</td>
+                                    <td class="px-5 py-4 text-right sm:px-6">
+                                        <a href="{{ url_for('booking.history_by_guest', guest_id=guest.guest_id) }}" class="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-cyan-200 bg-cyan-50 px-3.5 py-2 font-semibold text-cyan-800 transition hover:border-cyan-300 hover:bg-cyan-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 motion-reduce:transition-none">
+                                            <i class="bi bi-clock-history" aria-hidden="true"></i> Lịch sử
+                                        </a>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="px-6 py-14 text-center">
+                    <span class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-500" aria-hidden="true"><i class="bi bi-person-plus"></i></span>
+                    <h3 class="mt-4 font-semibold text-slate-900">Chưa có khách hàng</h3>
+                    <p class="mx-auto mt-1 max-w-sm text-sm text-slate-500">Thêm hồ sơ khách hàng đầu tiên để bắt đầu quản lý lịch sử lưu trú.</p>
+                    <a href="#guest-form" class="mt-4 inline-flex min-h-11 items-center rounded-lg px-3 font-semibold text-cyan-700 hover:bg-cyan-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500">Đi tới biểu mẫu</a>
+                </div>
+            {% endif %}
+        </div>
     </div>
-    <h3 class="font-semibold text-slate-800 mb-1">Khu vực code của Định</h3>
-    <p class="text-sm text-slate-500 max-w-md mx-auto mb-4">
-        File: <code class="text-indigo-600 font-mono">templates/guests.html</code>.<br>
-        Viết Form thêm khách hàng và Bảng hiển thị danh sách khách hàng bằng Tailwind CSS.
-    </p>
-</div>
-
-<!-- TODO (Định): Viết Form thêm khách hàng và Bảng danh sách tại đây -->
-
+</section>
 {% endblock %}
