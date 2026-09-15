@@ -26,7 +26,7 @@ Kiến trúc hiện tại chia thành ba lớp chính:
 2. `services`: dự kiến chứa nghiệp vụ và truy vấn Cassandra.
 3. `database`: tạo và cache kết nối tới Astra DB.
 
-Phần giao diện dùng Jinja2, Tailwind CSS từ CDN, Bootstrap Icons và Chart.js. Cấu trúc tổng thể khá rõ ràng cho một đồ án nhóm. Sau Task 4, tầng service đã có thể thêm và đọc khách sạn/khách hàng; tuy nhiên các route POST và giao diện tương ứng vẫn là placeholder. Phần phòng, đặt phòng và hóa đơn vẫn chủ yếu dừng ở khung sườn.
+Phần giao diện dùng Jinja2, Tailwind CSS từ CDN, Bootstrap Icons và Chart.js. Cấu trúc tổng thể khá rõ ràng cho một đồ án nhóm. Sau QLKS-04 và QLKS-05, tầng service đã có thể thêm và đọc khách sạn, khách hàng và phòng; tuy nhiên các route POST và giao diện tương ứng vẫn là placeholder. Phần đặt phòng và hóa đơn vẫn chủ yếu dừng ở khung sườn.
 
 ## Task 4: service khách sạn và khách hàng
 
@@ -102,6 +102,51 @@ Khi chạy trên Python 3.12, `cassandra-driver==3.29.2` cần module tương th
 
 Kết quả kiểm thử cuối cùng: cả 6 unit test và 2 integration test đều đạt (`Ran 8 tests ... OK`). Hai integration test đã kết nối Astra DB thật, insert rồi đọc lại thành công `H_QLKS04_TEST` trong bảng `hotels` và `G_QLKS04_TEST` trong bảng `guests`. QLKS-04 đã đáp ứng đầy đủ Acceptance Criteria và có thể chuyển sang trạng thái **Done**.
 
+## Task 5: service phòng theo khách sạn
+
+### Yêu cầu
+
+Triển khai `get_rooms_by_hotel(hotel_id)` và `create_room(...)` trong `services/hotel_service.py` theo partition key `hotel_id`.
+
+Acceptance Criteria: lấy đúng danh sách phòng của khách sạn chỉ định mà không quét toàn bộ bảng `rooms_by_hotel`.
+
+### Access pattern và thiết kế Cassandra
+
+Query Q1 được viết trước khi triển khai hàm:
+
+```sql
+SELECT hotel_id, room_number, room_type, price_per_night, is_available
+FROM rooms_by_hotel
+WHERE hotel_id = ?;
+```
+
+Primary key của bảng là `(hotel_id, room_number)`, trong đó `hotel_id` là partition key và `room_number` là clustering column. Vì query cung cấp đầy đủ partition key nên Cassandra định tuyến thẳng tới partition của khách sạn cần đọc, không cần `ALLOW FILTERING` và không quét toàn bảng.
+
+### Nội dung đã triển khai
+
+- `get_rooms_by_hotel` dùng prepared statement với `WHERE hotel_id = ?`, thực thi bằng tuple một phần tử `(hotel_id,)` và trả danh sách Cassandra Row.
+- `create_room` dùng prepared `INSERT` với đủ năm cột của bảng.
+- `price_per_night` được chuẩn hóa thành `Decimal` để khớp kiểu `decimal` của Cassandra.
+- `is_available` được chuẩn hóa thành `boolean`; các chuỗi `1`, `true`, `yes`, `on` được hiểu là `True`, còn chuỗi khác là `False`.
+- Khi không có session hoặc driver ném exception, hàm đọc trả `[]` và hàm ghi trả `False`.
+
+### Kiểm thử QLKS-05
+
+`tests/test_room_service.py` có bốn unit test, kiểm tra:
+
+1. CQL chứa `FROM rooms_by_hotel` và `WHERE hotel_id = ?`.
+2. Giá trị bind đúng `(hotel_id,)` cho query đọc.
+3. Prepared insert nhận đúng `Decimal` và `boolean`.
+4. Giá trị trả về an toàn khi mất kết nối hoặc Cassandra báo lỗi.
+
+`tests/test_room_service_integration.py` kiểm tra trực tiếp trên Astra DB bằng hai partition `H_QLKS05_TEST_A` và `H_QLKS05_TEST_B`. Test tạo `A501`, `A502` cho khách sạn A và `B901` cho khách sạn B, sau đó truy vấn khách sạn A và xác nhận:
+
+- Kết quả có `A501`, `A502`.
+- Mọi Cassandra Row đều có `hotel_id == H_QLKS05_TEST_A`.
+- Kết quả không chứa `B901` thuộc partition khách sạn B.
+
+Kết quả cuối: 4 unit test QLKS-05 và 1 integration test Astra đều đạt. Toàn bộ test suite của dự án hiện có 13 test và tất cả đều `OK`. QLKS-05 đáp ứng đầy đủ Acceptance Criteria và có thể chuyển sang trạng thái **Done**.
+
 ## 3. Kiến trúc và luồng xử lý
 
 Luồng request đi qua các thành phần như sau:
@@ -173,7 +218,7 @@ Các POST route hiện chỉ redirect, không đọc `request.form`, không gọ
 - `get_rooms_by_hotel`, `create_room`.
 - `get_all_guests`, `create_guest`.
 
-Bốn hàm của Task 4 (`get_all_hotels`, `create_hotel`, `get_all_guests`, `create_guest`) đã được triển khai với xử lý exception và prepared statements cho thao tác ghi. Hai hàm liên quan đến phòng (`get_rooms_by_hotel`, `create_room`) vẫn là stub.
+Sáu hàm thuộc QLKS-04 và QLKS-05 đã được triển khai với prepared statements, chuyển kiểu dữ liệu phù hợp Cassandra và xử lý exception. Toàn bộ phần service khách sạn, khách hàng và phòng hiện đã có unit test và integration test Astra.
 
 `booking_service.py` định nghĩa:
 
@@ -259,13 +304,14 @@ Giao diện phụ thuộc internet để tải Tailwind Browser CDN, Google Font
 | Dashboard | Có logic và giao diện |
 | Service liệt kê/thêm khách sạn | Đã triển khai và có unit test |
 | Route/template khách sạn | Chưa hoàn thiện |
-| Liệt kê/thêm phòng | Chưa triển khai |
+| Service liệt kê/thêm phòng theo khách sạn | Đã triển khai và test Astra |
+| Route/template phòng | Chưa hoàn thiện |
 | Service liệt kê/thêm khách hàng | Đã triển khai và có unit test |
 | Route/template khách hàng | Chưa hoàn thiện |
 | Tạo và tra cứu booking | Chưa triển khai |
 | Tạo và xem hóa đơn | Chưa triển khai |
 | Validation và thông báo lỗi | Chưa triển khai |
-| Test tự động | 6 unit test và 2 integration test Astra đều đạt |
+| Test tự động | 10 unit test và 3 integration test Astra đều đạt |
 | Authentication/authorization | Không có |
 
 Kết luận: ứng dụng hiện là skeleton có dashboard đọc thật từ database và service khách sạn/khách hàng đã có thể đọc, ghi Cassandra. Nếu Astra DB chưa được cấu hình, trang chủ và dashboard vẫn tải được với toàn bộ số liệu bằng 0; các trang nghiệp vụ vẫn chưa có đầy đủ giao diện và xử lý form.
@@ -274,7 +320,7 @@ Kết luận: ứng dụng hiện là skeleton có dashboard đọc thật từ 
 
 ### Mức cao
 
-1. **Nhiều chức năng cốt lõi chưa hoạt động.** Service phòng/booking/invoice vẫn là stub, các POST route không xử lý dữ liệu và năm template nghiệp vụ là placeholder. Riêng service khách sạn và khách hàng đã hoàn thành ở Task 4.
+1. **Nhiều chức năng cốt lõi chưa hoạt động.** Service booking/invoice vẫn là stub, các POST route không xử lý dữ liệu và năm template nghiệp vụ là placeholder. Service khách sạn, khách hàng và phòng đã hoàn thành qua QLKS-04/05.
 2. **Không có kiểm tra xung đột lịch phòng.** Cờ `is_available` không phụ thuộc ngày, nên thiết kế hiện tại có thể nhận nhiều booking trùng phòng và trùng khoảng thời gian.
 3. **Cấu hình chạy không an toàn khi triển khai.** `app.secret_key` có giá trị fallback cố định và `app.run(debug=True)` luôn bật debug, không sử dụng `FLASK_DEBUG` trong `.env.example`.
 
@@ -296,8 +342,8 @@ Kết luận: ứng dụng hiện là skeleton có dashboard đọc thật từ 
 
 ## 8. Thứ tự hoàn thiện được đề xuất
 
-1. Hoàn thiện hai hàm phòng còn lại trong `hotel_service.py` và các hàm trong `booking_service.py`, tiếp tục ưu tiên prepared statements.
-2. Hoàn thiện POST routes cho khách sạn/khách hàng: parse form, validate, gọi các service Task 4 và dùng flash message.
+1. Hoàn thiện các hàm trong `booking_service.py`, tiếp tục ưu tiên prepared statements và query theo partition key.
+2. Hoàn thiện POST routes cho khách sạn/khách hàng/phòng: parse form, validate, gọi service QLKS-04/05 và dùng flash message.
 3. Hoàn thiện năm template nghiệp vụ với form, bảng dữ liệu, trạng thái rỗng và lỗi.
 4. Thiết kế cơ chế kiểm tra phòng trống theo khoảng ngày trước khi cho phép tạo booking.
 5. Quyết định quy tắc đồng bộ khi tạo, cập nhật hoặc hủy booking giữa các bảng phi chuẩn hóa.
@@ -307,6 +353,6 @@ Kết luận: ứng dụng hiện là skeleton có dashboard đọc thật từ 
 
 ## 9. Kết luận
 
-Mã nguồn có cách chia module dễ hiểu và thể hiện đúng ý tưởng query-first/denormalization của Cassandra. Schema đã hỗ trợ trực tiếp các truy vấn Q1-Q4, còn Q5 được định hướng bằng batch ghi hai bảng. Task 4 đã hoàn thiện tầng service đọc/ghi cho `hotels` và `guests`, nhưng dự án vẫn chưa phải một hệ thống quản lý khách sạn hoàn chỉnh vì route, giao diện và các nghiệp vụ phòng/booking/invoice còn TODO.
+Mã nguồn có cách chia module dễ hiểu và thể hiện đúng ý tưởng query-first/denormalization của Cassandra. Schema đã hỗ trợ trực tiếp các truy vấn Q1-Q4, còn Q5 được định hướng bằng batch ghi hai bảng. QLKS-04 đã hoàn thiện service `hotels`/`guests`, QLKS-05 đã hoàn thiện Query Q1 và service `rooms_by_hotel`. Dự án vẫn chưa phải một hệ thống quản lý khách sạn hoàn chỉnh vì route, giao diện và các nghiệp vụ booking/invoice còn TODO.
 
-Ưu tiên tiếp theo là nối các service Task 4 vào route/template, hoàn thiện service phòng và booking, sau đó xử lý bài toán phòng trống theo khoảng ngày. Nếu chỉ điền các câu CQL đang comment mà không bổ sung kiểm tra lịch và cơ chế đồng bộ dữ liệu phi chuẩn hóa, ứng dụng có thể chạy nhưng vẫn dễ phát sinh booking trùng và dữ liệu không nhất quán.
+Ưu tiên tiếp theo là nối các service QLKS-04/05 vào route/template, hoàn thiện service booking, sau đó xử lý bài toán phòng trống theo khoảng ngày. Nếu chỉ điền các câu CQL đang comment mà không bổ sung kiểm tra lịch và cơ chế đồng bộ dữ liệu phi chuẩn hóa, ứng dụng có thể chạy nhưng vẫn dễ phát sinh booking trùng và dữ liệu không nhất quán.

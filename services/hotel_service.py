@@ -3,6 +3,8 @@
 # PHỤ TRÁCH: ĐỊNH
 # ====================================================================
 
+from decimal import Decimal
+
 from database.db import get_session
 
 # --------------------------------------------------------------------
@@ -81,34 +83,73 @@ def create_hotel(hotel_id, name, phone, address, city, country, amenities):
 
 def get_rooms_by_hotel(hotel_id):
     """
-    TODO (Định) - Query Q1 trong PDF:
-    - Câu lệnh CQL:
-      SELECT * FROM rooms_by_hotel WHERE hotel_id = ?;
-    - Trả về danh sách phòng của khách sạn được chọn.
+    Lấy danh sách phòng của một khách sạn theo Query Q1.
+
+    hotel_id là partition key của bảng rooms_by_hotel, vì vậy truy vấn chỉ
+    đọc đúng partition của khách sạn được chọn và không quét toàn bảng.
     """
     session = get_session()
     if not session:
         return []
 
-    # query = "SELECT * FROM rooms_by_hotel WHERE hotel_id = %s;"
-    # rows = session.execute(query, [hotel_id])
-    # return list(rows)
-    return []
+    try:
+        query = session.prepare("""
+            SELECT hotel_id, room_number, room_type,
+                   price_per_night, is_available
+            FROM rooms_by_hotel
+            WHERE hotel_id = ?;
+        """)
+        rows = session.execute(query, (hotel_id,))
+        return list(rows)
+    except Exception as error:
+        print(f"Error fetching rooms by hotel: {error}")
+        return []
 
 
 def create_room(hotel_id, room_number, room_type, price_per_night, is_available=True):
     """
-    TODO (Định):
-    - Câu lệnh CQL:
-      INSERT INTO rooms_by_hotel (hotel_id, room_number, room_type, price_per_night, is_available)
-      VALUES (?, ?, ?, ?, ?);
+    Thêm một phòng vào partition của khách sạn bằng prepared statement.
+
+    price_per_night được chuẩn hóa thành Decimal để khớp kiểu decimal và
+    is_available được chuẩn hóa thành boolean để khớp schema Cassandra.
     """
     session = get_session()
     if not session:
         return False
 
-    # Viết code insert phòng tại đây
-    pass
+    try:
+        normalized_price = (
+            price_per_night
+            if isinstance(price_per_night, Decimal)
+            else Decimal(str(price_per_night))
+        )
+        if isinstance(is_available, str):
+            normalized_availability = is_available.strip().lower() in {
+                "1",
+                "true",
+                "yes",
+                "on",
+            }
+        else:
+            normalized_availability = bool(is_available)
+
+        query = session.prepare("""
+            INSERT INTO rooms_by_hotel (
+                hotel_id, room_number, room_type,
+                price_per_night, is_available
+            ) VALUES (?, ?, ?, ?, ?);
+        """)
+        session.execute(query, (
+            hotel_id,
+            room_number,
+            room_type,
+            normalized_price,
+            normalized_availability,
+        ))
+        return True
+    except Exception as error:
+        print(f"Error creating room: {error}")
+        return False
 
 
 # --------------------------------------------------------------------
