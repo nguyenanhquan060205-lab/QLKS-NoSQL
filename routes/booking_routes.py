@@ -25,14 +25,32 @@ def list_bookings():
 @booking_bp.route('/bookings/create', methods=['POST'])
 def create_booking():
     """
-    TODO (Quân) - Trọng tâm Query Q5 (BATCH INSERT):
-    1. Lấy dữ liệu đặt phòng từ form (guest_id, guest_name, hotel_id, room_number,
-       check_in_date, check_out_date, status, total_amount)
-    2. Gọi booking_service.create_booking_batch(...) để đồng thời ghi vào 2 bảng
-       bookings_by_guest và bookings_by_hotel_date
-    3. Chuyển hướng lại trang /bookings
+    [QUÂN - TASK QLKS-08] - Route xử lý tạo Đặt phòng dùng BATCH INSERT Q5
     """
-    # Xử lý tạo đặt phòng tại đây
+    guest_id = request.form.get('guest_id')
+    guest_name = request.form.get('guest_name')
+    hotel_id = request.form.get('hotel_id')
+    room_number = request.form.get('room_number')
+    check_in_date = request.form.get('check_in_date')
+    check_out_date = request.form.get('check_out_date')
+    total_amount = request.form.get('total_amount', 0)
+    status = request.form.get('status', 'CONFIRMED')
+
+    try:
+        booking_id = booking_service.create_booking_batch(
+            guest_id=guest_id,
+            guest_name=guest_name,
+            hotel_id=hotel_id,
+            room_number=room_number,
+            check_in_date=check_in_date,
+            check_out_date=check_out_date,
+            status=status,
+            total_amount=total_amount
+        )
+        flash(f"Đặt phòng thành công (BATCH INSERT)! Mã Booking: {booking_id}", "success")
+    except Exception as e:
+        flash(f"Lỗi khi đặt phòng: {str(e)}", "error")
+
     return redirect(url_for('booking.list_bookings'))
 
 
