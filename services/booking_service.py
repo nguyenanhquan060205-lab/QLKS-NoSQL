@@ -122,17 +122,36 @@ def create_booking_batch(guest_id, guest_name, hotel_id, room_number,
 
 def get_bookings_by_guest(guest_id):
     """
-    [QUÂN - TASK QLKS-09] - Query Q2 trong PDF:
-    - Câu lệnh CQL:
-      SELECT * FROM bookings_by_guest WHERE guest_id = ?;
-    - Trả về toàn bộ lịch sử đặt phòng của khách hàng.
+    [QUÂN - TASK QLKS-09] - Query Q2 trong đề cương PDF:
+    Tra cứu toàn bộ lịch sử đặt phòng của khách hàng theo mã khách hàng (guest_id).
+    
+    Nguyên lý NoSQL Cassandra:
+    - Bảng bookings_by_guest có Partition Key là guest_id, Clustering Key là booking_id.
+    - Truy vấn WHERE guest_id = ? định tuyến trực tiếp đến Partition duy nhất trên node,
+      đạt tốc độ truy vấn O(1) mà không cần scan toàn bộ bảng.
     """
+    if not guest_id:
+        return []
+
+    guest_id_str = str(guest_id).strip()
     session = get_session()
+
     if session:
-        query = "SELECT * FROM bookings_by_guest WHERE guest_id = %s;"
-        rows = session.execute(query, (guest_id,))
-        return list(rows)
-    return [b for b in _mock_bookings_by_guest if b["guest_id"] == guest_id]
+        try:
+            stmt = session.prepare("""
+                SELECT guest_id, booking_id, hotel_id, room_number, 
+                       check_in_date, check_out_date, status, total_amount
+                FROM bookings_by_guest
+                WHERE guest_id = ?;
+            """)
+            rows = session.execute(stmt, (guest_id_str,))
+            return list(rows)
+        except Exception as error:
+            print(f"❌ [Lỗi truy vấn Q2 - bookings_by_guest]: {error}")
+            return []
+
+    # Mock fallback
+    return [b for b in _mock_bookings_by_guest if b["guest_id"] == guest_id_str]
 
 
 # --------------------------------------------------------------------
@@ -141,25 +160,50 @@ def get_bookings_by_guest(guest_id):
 
 def get_bookings_by_hotel_date(hotel_id, check_in_date):
     """
-    [QUÂN - TASK QLKS-09] - Query Q3 trong PDF:
-    - Câu lệnh CQL:
-      SELECT * FROM bookings_by_hotel_date 
-      WHERE hotel_id = ? AND check_in_date = ?;
-    - Trả về danh sách khách check-in tại khách sạn trong ngày chỉ định.
+    [QUÂN - TASK QLKS-09] - Query Q3 trong đề cương PDF:
+    Tra cứu danh sách khách check-in tại khách sạn trong ngày chỉ định.
+
+    Nguyên lý NoSQL Cassandra:
+    - Bảng bookings_by_hotel_date có Composite Partition Key là ((hotel_id, check_in_date)),
+      Clustering Key là booking_id.
+    - Bắt buộc phải cung cấp đủ cả hotel_id VÀ check_in_date để Cassandra tính toán hash partition,
+      giúp hệ thống tìm kiếm siêu tốc trên cụm dữ liệu phân tán.
     """
+    if not hotel_id or not check_in_date:
+        return []
+
+    hotel_id_str = str(hotel_id).strip()
+
+    # Chuẩn hóa kiểu dữ liệu date cho Cassandra DateType
     if isinstance(check_in_date, str):
-        in_date = datetime.strptime(check_in_date.strip(), "%Y-%m-%d").date()
+        try:
+            in_date = datetime.strptime(check_in_date.strip(), "%Y-%m-%d").date()
+        except ValueError:
+            print(f"❌ [Lỗi định dạng ngày Q3]: {check_in_date} không đúng định dạng YYYY-MM-DD")
+            return []
     else:
         in_date = check_in_date
 
     session = get_session()
+
     if session:
-        query = "SELECT * FROM bookings_by_hotel_date WHERE hotel_id = %s AND check_in_date = %s;"
-        rows = session.execute(query, (hotel_id, in_date))
-        return list(rows)
+        try:
+            stmt = session.prepare("""
+                SELECT hotel_id, check_in_date, booking_id, 
+                       guest_id, guest_name, room_number, status
+                FROM bookings_by_hotel_date
+                WHERE hotel_id = ? AND check_in_date = ?;
+            """)
+            rows = session.execute(stmt, (hotel_id_str, in_date))
+            return list(rows)
+        except Exception as error:
+            print(f"❌ [Lỗi truy vấn Q3 - bookings_by_hotel_date]: {error}")
+            return []
+
+    # Mock fallback
     return [
         b for b in _mock_bookings_by_hotel_date 
-        if b["hotel_id"] == hotel_id and str(b["check_in_date"]) == str(in_date)
+        if b["hotel_id"] == hotel_id_str and str(b["check_in_date"]) == str(in_date)
     ]
 
 
