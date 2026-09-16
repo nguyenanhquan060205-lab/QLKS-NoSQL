@@ -1,46 +1,360 @@
 {% extends "base.html" %}
 
-{% block title %}Quản Lý Đặt Phòng - Phụ trách: Quân{% endblock %}
+{% block title %}Quản lý Đặt phòng & Hóa đơn - QLKS NoSQL{% endblock %}
 
 {% block content %}
-<!-- ================================================================
-     PHỤ TRÁCH: QUÂN (Nghiệp vụ Đặt phòng - Query Q2, Q3, Q5 BATCH)
-     Bảng dữ liệu: 
-       - bookings_by_guest (guest_id, booking_id, hotel_id, room_number, check_in_date, check_out_date, status, total_amount)
-       - bookings_by_hotel_date (hotel_id, check_in_date, booking_id, guest_id, guest_name, room_number, status)
-     
-     TODO (Quân):
-     1. Form tạo Đặt phòng mới (POST về /bookings/create - gọi BATCH INSERT Q5)
-     2. Form tra cứu đặt phòng theo khách sạn & ngày check-in (GET về /bookings/hotel-date - Query Q3)
-     3. Bảng hiển thị danh sách đặt phòng
-     4. Nút bấm xem Hóa đơn dẫn tới /invoices/{booking_id} (Query Q4)
-================================================================ -->
-
-<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-    <div>
-        <h1 class="text-2xl font-bold text-slate-900 flex items-center gap-2">
-            <span>📅</span> Quản Lý Đặt Phòng
-        </h1>
-        <p class="text-sm text-slate-500 mt-1">
-            Trọng tâm: <span class="text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded font-medium">BATCH INSERT Q5</span> (Ghi đồng thời 2 bảng: bookings_by_guest & bookings_by_hotel_date)
-        </p>
+<section aria-labelledby="bookings-heading" class="space-y-6">
+    <!-- TIÊU ĐỀ TRANG -->
+    <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+            <p class="text-sm font-semibold uppercase tracking-wider text-amber-700">QLKS-11 · Phụ trách: Quân</p>
+            <h1 id="bookings-heading" class="mt-1 flex items-center gap-3 text-2xl sm:text-3xl font-bold text-slate-950">
+                <span class="flex h-11 w-11 items-center justify-center rounded-xl bg-amber-100 text-amber-700" aria-hidden="true">
+                    <i class="bi bi-calendar-check"></i>
+                </span>
+                Quản lý Đặt phòng & Hóa đơn
+            </h1>
+            <p class="mt-2 text-sm sm:text-base text-slate-600">
+                Ghi đồng thời 2 bảng (<span class="font-semibold text-amber-700">Atomic BATCH Q5</span>), tra cứu lịch sử (<span class="font-medium text-slate-800">Q2 & Q3</span>) và xuất hóa đơn (<span class="font-medium text-slate-800">Q4</span>).
+            </p>
+        </div>
+        <div class="inline-flex w-fit items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm">
+            <span class="h-2.5 w-2.5 rounded-full {% if bookings %}bg-emerald-500{% else %}bg-amber-500{% endif %}" aria-hidden="true"></span>
+            {{ bookings|length }} kết quả đặt phòng
+        </div>
     </div>
-    <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-200">
-        Phụ trách: Quân
-    </span>
-</div>
 
-<div class="bg-slate-50 border-2 border-dashed border-slate-300 rounded-2xl p-8 text-center">
-    <div class="w-12 h-12 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center mx-auto mb-3 text-xl">
-        <i class="bi bi-calendar2-check"></i>
+    <!-- BỐ CỤC CHÍNH: 2 CỘT (FORM BATCH Q5 & KHU VỰC TRA CỨU Q2, Q3, Q4) -->
+    <div class="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,390px)_minmax(0,1fr)] lg:items-start">
+        
+        <!-- CỘT TRÁI: FORM ĐẶT PHÒNG MỚI (BATCH INSERT Q5) -->
+        <aside id="booking-form" class="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-sm lg:sticky lg:top-24">
+            <div class="mb-5 border-b border-slate-100 pb-4">
+                <div class="flex items-center justify-between">
+                    <h2 class="text-lg font-bold text-slate-950 flex items-center gap-2">
+                        <i class="bi bi-lightning-charge-fill text-amber-600"></i> Đặt phòng mới
+                    </h2>
+                    <span class="px-2 py-0.5 text-xs font-semibold rounded bg-amber-100 text-amber-800">Batch Q5</span>
+                </div>
+                <p class="mt-1 text-xs text-slate-500">
+                    Ghi đồng thời vào <code class="text-amber-800">bookings_by_guest</code> và <code class="text-amber-800">bookings_by_hotel_date</code>.
+                </p>
+            </div>
+
+            <form action="{{ url_for('booking.create_booking') }}" method="post" class="space-y-4" id="form-create-booking">
+                <!-- Chọn khách hàng -->
+                <div>
+                    <label for="select-guest" class="block text-sm font-medium text-slate-700">Khách hàng <span class="text-red-600" aria-hidden="true">*</span></label>
+                    <select id="select-guest" name="guest_id" required class="mt-1.5 min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-slate-900 outline-none transition focus-visible:border-amber-600 focus-visible:ring-2 focus-visible:ring-amber-200" onchange="onGuestChange(this)">
+                        <option value="">-- Chọn khách hàng đã có --</option>
+                        {% for g in guests %}
+                            {% set gid = g.guest_id if g.guest_id is defined else g['guest_id'] %}
+                            {% set gname = g.full_name if g.full_name is defined else g['full_name'] %}
+                            <option value="{{ gid }}" data-name="{{ gname }}">{{ gname }} ({{ gid }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Tên khách hàng (ẩn hoặc chỉnh sửa) -->
+                <div>
+                    <label for="guest-name" class="block text-sm font-medium text-slate-700">Họ và tên khách</label>
+                    <input id="guest-name" name="guest_name" type="text" placeholder="Tự động điền theo khách hàng" class="mt-1.5 min-h-11 w-full rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5 text-slate-900 outline-none transition focus-visible:border-amber-600 focus-visible:ring-2 focus-visible:ring-amber-200">
+                </div>
+
+                <!-- Chọn khách sạn -->
+                <div>
+                    <label for="select-hotel" class="block text-sm font-medium text-slate-700">Khách sạn <span class="text-red-600" aria-hidden="true">*</span></label>
+                    <select id="select-hotel" name="hotel_id" required class="mt-1.5 min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-slate-900 outline-none transition focus-visible:border-amber-600 focus-visible:ring-2 focus-visible:ring-amber-200">
+                        <option value="">-- Chọn khách sạn lưu trú --</option>
+                        {% for h in hotels %}
+                            {% set hid = h.hotel_id if h.hotel_id is defined else h['hotel_id'] %}
+                            {% set hname = h.name if h.name is defined else h['name'] %}
+                            <option value="{{ hid }}">{{ hname }} ({{ hid }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Số phòng -->
+                <div>
+                    <label for="room-number" class="block text-sm font-medium text-slate-700">Số phòng <span class="text-red-600" aria-hidden="true">*</span></label>
+                    <input id="room-number" name="room_number" type="text" required placeholder="Ví dụ: 101, 202, 305" class="mt-1.5 min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-slate-900 outline-none transition focus-visible:border-amber-600 focus-visible:ring-2 focus-visible:ring-amber-200">
+                </div>
+
+                <!-- Ngày Check-in & Check-out -->
+                <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div>
+                        <label for="check-in-date" class="block text-sm font-medium text-slate-700">Check-in <span class="text-red-600" aria-hidden="true">*</span></label>
+                        <input id="check-in-date" name="check_in_date" type="date" required class="mt-1.5 min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-900 outline-none transition focus-visible:border-amber-600 focus-visible:ring-2 focus-visible:ring-amber-200">
+                    </div>
+                    <div>
+                        <label for="check-out-date" class="block text-sm font-medium text-slate-700">Check-out <span class="text-red-600" aria-hidden="true">*</span></label>
+                        <input id="check-out-date" name="check_out_date" type="date" required class="mt-1.5 min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-900 outline-none transition focus-visible:border-amber-600 focus-visible:ring-2 focus-visible:ring-amber-200">
+                    </div>
+                </div>
+
+                <!-- Tổng tiền & Phương thức thanh toán -->
+                <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div>
+                        <label for="total-amount" class="block text-sm font-medium text-slate-700">Tổng tiền (VNĐ)</label>
+                        <input id="total-amount" name="total_amount" type="number" step="50000" min="0" value="2500000" required class="mt-1.5 min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-slate-900 outline-none transition focus-visible:border-amber-600 focus-visible:ring-2 focus-visible:ring-amber-200">
+                    </div>
+                    <div>
+                        <label for="payment-method" class="block text-sm font-medium text-slate-700">Thanh toán</label>
+                        <select id="payment-method" name="payment_method" class="mt-1.5 min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-900 outline-none transition focus-visible:border-amber-600 focus-visible:ring-2 focus-visible:ring-amber-200">
+                            <option value="TIỀN MẶT">Tiền mặt</option>
+                            <option value="THẺ TÍN DỤNG">Thẻ tín dụng</option>
+                            <option value="CHUYỂN KHOẢN">Chuyển khoản</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Trạng thái -->
+                <div>
+                    <label for="status" class="block text-sm font-medium text-slate-700">Trạng thái đặt phòng</label>
+                    <select id="status" name="status" class="mt-1.5 min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-900 outline-none transition focus-visible:border-amber-600 focus-visible:ring-2 focus-visible:ring-amber-200">
+                        <option value="CONFIRMED" selected>Đã xác nhận (CONFIRMED)</option>
+                        <option value="CHECKED_IN">Đã nhận phòng (CHECKED_IN)</option>
+                        <option value="PENDING">Chờ xử lý (PENDING)</option>
+                    </select>
+                </div>
+
+                <!-- Nút Submit BATCH Q5 -->
+                <button type="submit" class="mt-2 inline-flex min-h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-amber-600 px-4 py-3 font-semibold text-white shadow-md transition hover:bg-amber-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-60">
+                    <i class="bi bi-calendar2-plus" aria-hidden="true"></i>
+                    Đặt phòng (Batch Insert Q5)
+                </button>
+            </form>
+        </aside>
+
+        <!-- CỘT PHẢI: BỘ LỌC TRA CỨU (Q2 & Q3) & DANH SÁCH ĐẶT PHÒNG KÈM XEM HÓA ĐƠN (Q4) -->
+        <div class="space-y-6">
+
+            <!-- BỘ LỌC TRA CỨU ĐA NĂNG -->
+            <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                <div class="mb-4">
+                    <h2 class="text-base font-bold text-slate-900 flex items-center gap-2">
+                        <i class="bi bi-funnel-fill text-amber-600"></i> Bộ Lọc Tra Cứu (NoSQL Query-First)
+                    </h2>
+                    <p class="text-xs text-slate-500 mt-0.5">
+                        Tra cứu theo Partition Key trực tiếp tới node dữ liệu trong Cassandra AstraDB.
+                    </p>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <!-- BỘ LỌC 1: TRA CỨU THEO KHÁCH HÀNG (QUERY Q2) -->
+                    <div class="rounded-xl border border-amber-200/70 bg-amber-50/40 p-4">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-xs font-bold uppercase tracking-wider text-amber-800 flex items-center gap-1.5">
+                                <i class="bi bi-person-lines-fill"></i> Query Q2: Lịch sử theo khách
+                            </span>
+                            <span class="text-[11px] font-mono bg-amber-100 text-amber-900 px-1.5 py-0.5 rounded">bookings_by_guest</span>
+                        </div>
+                        <form action="{{ url_for('booking.list_bookings') }}" method="get" class="space-y-3">
+                            <div>
+                                <select name="guest_id" required class="min-h-10 w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-900 outline-none focus-visible:border-amber-600">
+                                    <option value="">-- Chọn khách hàng tra cứu --</option>
+                                    {% for g in guests %}
+                                        {% set gid = g.guest_id if g.guest_id is defined else g['guest_id'] %}
+                                        {% set gname = g.full_name if g.full_name is defined else g['full_name'] %}
+                                        <option value="{{ gid }}" {% if guest_id == gid %}selected{% endif %}>{{ gname }} ({{ gid }})</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <button type="submit" class="inline-flex min-h-10 w-full cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-amber-700 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-amber-800">
+                                <i class="bi bi-search"></i> Tra cứu lịch sử khách (Q2)
+                            </button>
+                        </form>
+                    </div>
+
+                    <!-- BỘ LỌC 2: TRA CỨU THEO KHÁCH SẠN VÀ NGÀY (QUERY Q3) -->
+                    <div class="rounded-xl border border-indigo-200/70 bg-indigo-50/40 p-4">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-xs font-bold uppercase tracking-wider text-indigo-800 flex items-center gap-1.5">
+                                <i class="bi bi-building-check"></i> Query Q3: Khách sạn & Ngày
+                            </span>
+                            <span class="text-[11px] font-mono bg-indigo-100 text-indigo-900 px-1.5 py-0.5 rounded">bookings_by_hotel_date</span>
+                        </div>
+                        <form action="{{ url_for('booking.list_bookings') }}" method="get" class="space-y-3">
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                <select name="hotel_id" required class="min-h-10 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm text-slate-900 outline-none focus-visible:border-indigo-600">
+                                    <option value="">-- Khách sạn --</option>
+                                    {% for h in hotels %}
+                                        {% set hid = h.hotel_id if h.hotel_id is defined else h['hotel_id'] %}
+                                        {% set hname = h.name if h.name is defined else h['name'] %}
+                                        <option value="{{ hid }}" {% if hotel_id == hid %}selected{% endif %}>{{ hname }}</option>
+                                    {% endfor %}
+                                </select>
+                                <input name="check_in_date" type="date" required value="{{ check_in_date or '' }}" class="min-h-10 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm text-slate-900 outline-none focus-visible:border-indigo-600">
+                            </div>
+                            <button type="submit" class="inline-flex min-h-10 w-full cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-indigo-700 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-800">
+                                <i class="bi bi-search"></i> Tra cứu theo ngày (Q3)
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+                {% if search_type %}
+                    <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-600">
+                        <span>Đang lọc theo: <strong class="text-slate-900">{% if search_type == 'guest' %}Khách hàng (Mã: {{ guest_id }}){% else %}Khách sạn ({{ hotel_id }}) vào ngày ({{ check_in_date }}){% endif %}</strong></span>
+                        <a href="{{ url_for('booking.list_bookings') }}" class="text-amber-700 font-semibold hover:underline flex items-center gap-1">
+                            <i class="bi bi-x-circle"></i> Đặt lại bộ lọc
+                        </a>
+                    </div>
+                {% endif %}
+            </div>
+
+            <!-- BẢNG DANH SÁCH KẾT QUẢ ĐẶT PHÒNG -->
+            <div class="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                <div class="border-b border-slate-200 px-5 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div>
+                        <h2 class="font-bold text-slate-950 flex items-center gap-2">
+                            <span>📋</span> Kết quả đặt phòng
+                        </h2>
+                        <p class="mt-0.5 text-xs text-slate-500">
+                            Bấm vào nút <strong class="text-amber-700">Xem Hóa Đơn</strong> ở mỗi dòng để xem phiếu chi tiết (Query Q4).
+                        </p>
+                    </div>
+                    {% if bookings %}
+                        <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">
+                            {{ bookings|length }} đơn đặt
+                        </span>
+                    {% endif %}
+                </div>
+
+                {% if bookings %}
+                    <div class="overflow-x-auto">
+                        <table class="w-full min-w-[780px] text-left text-sm">
+                            <thead class="bg-slate-50 text-xs uppercase tracking-wider text-slate-500">
+                                <tr>
+                                    <th scope="col" class="px-5 py-3.5 font-semibold">Mã Booking</th>
+                                    <th scope="col" class="px-5 py-3.5 font-semibold">Khách hàng</th>
+                                    <th scope="col" class="px-5 py-3.5 font-semibold">Khách sạn / Phòng</th>
+                                    <th scope="col" class="px-5 py-3.5 font-semibold">Thời gian</th>
+                                    <th scope="col" class="px-5 py-3.5 font-semibold">Tổng tiền</th>
+                                    <th scope="col" class="px-5 py-3.5 font-semibold">Trạng thái</th>
+                                    <th scope="col" class="px-5 py-3.5 text-right font-semibold">Thao tác</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100">
+                                {% for b in bookings %}
+                                    {% set b_id = b.booking_id if b.booking_id is defined else b['booking_id'] %}
+                                    {% set g_id = b.guest_id if b.guest_id is defined else b.get('guest_id', '') %}
+                                    {% set g_name = b.guest_name if b.guest_name is defined else b.get('guest_name', '') %}
+                                    {% set h_id = b.hotel_id if b.hotel_id is defined else b.get('hotel_id', '') %}
+                                    {% set r_num = b.room_number if b.room_number is defined else b.get('room_number', '') %}
+                                    {% set in_d = b.check_in_date if b.check_in_date is defined else b.get('check_in_date', '') %}
+                                    {% set out_d = b.check_out_date if b.check_out_date is defined else b.get('check_out_date', '') %}
+                                    {% set status_val = b.status if b.status is defined else b.get('status', 'CONFIRMED') %}
+                                    {% set amt = b.total_amount if b.total_amount is defined else b.get('total_amount', 0) %}
+
+                                    <tr class="align-middle transition hover:bg-amber-50/30">
+                                        <!-- Mã Booking -->
+                                        <td class="px-5 py-4 font-mono font-bold text-amber-900">
+                                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-amber-100 text-xs">
+                                                <i class="bi bi-ticket-perforated"></i> {{ b_id }}
+                                            </span>
+                                        </td>
+                                        <!-- Khách hàng -->
+                                        <td class="px-5 py-4">
+                                            <p class="font-semibold text-slate-900">{{ g_name or g_id }}</p>
+                                            {% if g_name and g_id %}
+                                                <p class="font-mono text-xs text-slate-500">{{ g_id }}</p>
+                                            {% endif %}
+                                        </td>
+                                        <!-- Khách sạn / Phòng -->
+                                        <td class="px-5 py-4 text-slate-700">
+                                            <p class="font-medium text-slate-900">{{ h_id }}</p>
+                                            <p class="text-xs text-slate-500">Phòng: <span class="font-semibold text-slate-800">{{ r_num }}</span></p>
+                                        </td>
+                                        <!-- Thời gian lưu trú -->
+                                        <td class="px-5 py-4 text-xs text-slate-600">
+                                            <p><span class="font-medium text-slate-900">In:</span> {{ in_d }}</p>
+                                            {% if out_d %}
+                                                <p><span class="font-medium text-slate-900">Out:</span> {{ out_d }}</p>
+                                            {% endif %}
+                                        </td>
+                                        <!-- Tổng tiền -->
+                                        <td class="px-5 py-4 font-semibold text-slate-900">
+                                            {% if amt %}
+                                                {{ "{:,.0f}".format(amt|float) }} đ
+                                            {% else %}
+                                                -
+                                            {% endif %}
+                                        </td>
+                                        <!-- Trạng thái -->
+                                        <td class="px-5 py-4">
+                                            {% if status_val == 'CONFIRMED' %}
+                                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">
+                                                    Đã xác nhận
+                                                </span>
+                                            {% elif status_val == 'CHECKED_IN' %}
+                                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">
+                                                    Đang ở
+                                                </span>
+                                            {% else %}
+                                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700">
+                                                    {{ status_val }}
+                                                </span>
+                                            {% endif %}
+                                        </td>
+                                        <!-- Nút hành động xem Hóa đơn (Q4) -->
+                                        <td class="px-5 py-4 text-right">
+                                            <a href="{{ url_for('booking.view_invoice', booking_id=b_id) }}" class="inline-flex min-h-10 cursor-pointer items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-900 shadow-sm transition hover:bg-amber-100 hover:border-amber-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500">
+                                                <i class="bi bi-receipt" aria-hidden="true"></i> Xem HĐ (Q4)
+                                            </a>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <!-- EMPTY STATE THÂN THIỆN -->
+                    <div class="px-6 py-14 text-center">
+                        <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-50 text-amber-600 text-2xl mb-3 shadow-inner">
+                            <i class="bi bi-calendar2-range"></i>
+                        </div>
+                        <h3 class="font-bold text-slate-900 text-base">Chưa có kết quả đặt phòng nào</h3>
+                        <p class="mx-auto mt-1 max-w-md text-sm text-slate-500">
+                            Sử dụng biểu mẫu bên trái để tạo Đặt phòng mới (sử dụng Batch Statement Q5) hoặc chọn bộ lọc để tra cứu theo khách hàng (Q2) hay theo khách sạn và ngày check-in (Q3).
+                        </p>
+                        <div class="mt-5 flex flex-wrap items-center justify-center gap-3">
+                            <a href="#booking-form" class="inline-flex items-center gap-1.5 rounded-xl bg-amber-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-amber-700 transition">
+                                <i class="bi bi-plus-lg"></i> Tạo đặt phòng mới
+                            </a>
+                        </div>
+                    </div>
+                {% endif %}
+            </div>
+
+        </div>
     </div>
-    <h3 class="font-semibold text-slate-800 mb-1">Khu vực code của Quân</h3>
-    <p class="text-sm text-slate-500 max-w-md mx-auto mb-4">
-        File: <code class="text-indigo-600 font-mono">templates/bookings.html</code>.<br>
-        Dùng Tailwind CSS dựng Form đặt phòng (sử dụng Batch Statement), bộ lọc tìm kiếm theo khách hoặc ngày check-in và bảng hiển thị.
-    </p>
-</div>
+</section>
 
-<!-- TODO (Quân): Viết Form tạo đặt phòng và Bảng danh sách tại đây -->
+<!-- JAVASCRIPT HỖ TRỢ ĐIỀN TÊN KHÁCH HÀNG TỰ ĐỘNG -->
+<script>
+    function onGuestChange(selectElement) {
+        const selectedOption = selectElement.options[selectElement.selectedIndex];
+        const guestName = selectedOption.getAttribute('data-name');
+        const nameInput = document.getElementById('guest-name');
+        if (guestName && nameInput) {
+            nameInput.value = guestName;
+        }
+    }
 
+    // Thiết lập ngày check-in mặc định hôm nay nếu chưa chọn
+    document.addEventListener('DOMContentLoaded', function() {
+        const checkIn = document.getElementById('check-in-date');
+        const checkOut = document.getElementById('check-out-date');
+        if (checkIn && !checkIn.value) {
+            const today = new Date().toISOString().split('T')[0];
+            checkIn.value = today;
+            if (checkOut && !checkOut.value) {
+                const tomorrow = new Date();
+                tomorrow.setDate(tomorrow.getDate() + 2);
+                checkOut.value = tomorrow.toISOString().split('T')[0];
+            }
+        }
+    });
+</script>
 {% endblock %}
