@@ -74,6 +74,53 @@ class BookingServiceAstraIntegrationTest(unittest.TestCase):
 
         print(f"🎉 TÍCH HỢP ASTRADB THÀNH CÔNG: Booking {booking_id} đã được lưu và đọc chính xác từ cả 2 bảng (Q2 & Q3)!")
 
+    def test_create_and_get_invoice_q4(self):
+        """
+        QLKS-10 Integration Test:
+        1. Gọi create_invoice(...) lưu bản ghi vào bảng invoices_by_booking trên AstraDB.
+        2. Gọi get_invoice_by_booking(booking_id) kiểm tra truy vấn Query Q4 theo Partition Key.
+        3. Assert kiểm tra tính toàn vẹn của các trường dữ liệu.
+        """
+        test_suffix = datetime.now().strftime("%m%d%H%M%S")
+        booking_id = f"BK_INV_TEST_{test_suffix}"
+        invoice_id = f"INV_INT_{test_suffix}"
+        guest_name = "Trần Thị Test"
+        hotel_id = "H001"
+        issue_date = "2026-09-16"
+        payment_method = "CREDIT_CARD"
+        payment_status = "PAID"
+        total_amount = 4200000
+
+        # 1. Gọi create_invoice ghi vào AstraDB
+        created_invoice_id = booking_service.create_invoice(
+            booking_id=booking_id,
+            invoice_id=invoice_id,
+            guest_name=guest_name,
+            hotel_id=hotel_id,
+            issue_date=issue_date,
+            payment_method=payment_method,
+            payment_status=payment_status,
+            total_amount=total_amount,
+        )
+        self.assertEqual(created_invoice_id, invoice_id, "create_invoice không trả về đúng invoice_id")
+
+        # 2. Truy vấn Q4 bằng get_invoice_by_booking
+        invoice = booking_service.get_invoice_by_booking(booking_id)
+        self.assertIsNotNone(invoice, "Không tìm thấy hóa đơn theo booking_id trên AstraDB")
+
+        # Hỗ trợ cả Row object lẫn dict
+        get_val = lambda key: invoice[key] if isinstance(invoice, dict) else getattr(invoice, key, None)
+
+        self.assertEqual(get_val("booking_id"), booking_id)
+        self.assertEqual(get_val("invoice_id"), invoice_id)
+        self.assertEqual(get_val("guest_name"), guest_name)
+        self.assertEqual(get_val("hotel_id"), hotel_id)
+        self.assertEqual(get_val("payment_method"), payment_method)
+        self.assertEqual(get_val("payment_status"), payment_status)
+        self.assertEqual(float(get_val("total_amount")), float(total_amount))
+
+        print(f"🎉 TÍCH HỢP ASTRADB THÀNH CÔNG: Hóa đơn {invoice_id} cho Booking {booking_id} được lưu và đọc chính xác (Query Q4)!")
+
 
 if __name__ == "__main__":
     unittest.main()
