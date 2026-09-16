@@ -213,33 +213,134 @@ def get_bookings_by_hotel_date(hotel_id, check_in_date):
 
 def get_invoice_by_booking(booking_id):
     """
-    TODO (Quân) - Query Q4 trong PDF:
-    - Câu lệnh CQL:
-      SELECT * FROM invoices_by_booking WHERE booking_id = ?;
-    - Trả về thông tin hóa đơn gắn liền với mã đặt phòng.
+    [QUÂN - TASK QLKS-10] - Query Q4 trong đề cương PDF:
+    Tra cứu hóa đơn thanh toán theo mã đặt phòng (booking_id).
+
+    Nguyên lý NoSQL Cassandra:
+    - Bảng invoices_by_booking có Partition Key là booking_id, Clustering Key là invoice_id.
+    - Truy vấn WHERE booking_id = ? định tuyến trực tiếp đến Partition duy nhất trên node,
+      đạt tốc độ truy vấn O(1) theo đúng thiết kế Query-First.
+
+    Câu lệnh CQL:
+      SELECT booking_id, invoice_id, guest_name, hotel_id,
+             issue_date, payment_method, payment_status, total_amount
+      FROM invoices_by_booking
+      WHERE booking_id = ?;
+
+    Trả về bản ghi hóa đơn (Row / dict) hoặc None nếu không tìm thấy.
     """
-    session = get_session()
-    if not session:
+    if not booking_id:
         return None
 
-    # query = "SELECT * FROM invoices_by_booking WHERE booking_id = %s;"
-    # rows = session.execute(query, [booking_id])
-    # return rows.one()
+    booking_id_str = str(booking_id).strip()
+    session = get_session()
+
+    if session:
+        try:
+            stmt = session.prepare("""
+                SELECT booking_id, invoice_id, guest_name, hotel_id,
+                       issue_date, payment_method, payment_status, total_amount
+                FROM invoices_by_booking
+                WHERE booking_id = ?;
+            """)
+            rows = session.execute(stmt, (booking_id_str,))
+            return rows.one() if hasattr(rows, "one") else (rows[0] if rows else None)
+        except Exception as error:
+            print(f"❌ [Lỗi truy vấn Q4 - invoices_by_booking]: {error}")
+            return None
+
+    # Mock fallback
+    for inv in _mock_invoices:
+        if inv.get("booking_id") == booking_id_str:
+            return inv
     return None
 
 
-def create_invoice(booking_id, invoice_id, guest_name, hotel_id, 
-                   issue_date, payment_method, payment_status, total_amount):
+def create_invoice(booking_id, invoice_id=None, guest_name="", hotel_id="", 
+                   issue_date=None, payment_method="CASH", payment_status="PAID", total_amount=0):
     """
-    TODO (Quân):
-    - Câu lệnh CQL:
-      INSERT INTO invoices_by_booking (booking_id, invoice_id, guest_name, hotel_id,
-                                       issue_date, payment_method, payment_status, total_amount)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?);
-    """
-    session = get_session()
-    if not session:
-        return False
+    [QUÂN - TASK QLKS-10] - Tạo hóa đơn thanh toán cho mã đặt phòng (bảng invoices_by_booking).
 
-    # Viết code tạo hóa đơn tại đây
-    pass
+    Theo mô hình dữ liệu Cassandra:
+      - Partition Key: booking_id
+      - Clustering Key: invoice_id
+
+    Câu lệnh CQL:
+      INSERT INTO invoices_by_booking (
+          booking_id, invoice_id, guest_name, hotel_id,
+          issue_date, payment_method, payment_status, total_amount
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+
+    Trả về invoice_id nếu thành công, None nếu thất bại.
+    """
+    if not booking_id:
+        return None
+
+    booking_id_str = str(booking_id).strip()
+    if not invoice_id:
+        invoice_id = f"INV{datetime.now().strftime('%Y%m%d%H%M%S')}"
+    else:
+        invoice_id = str(invoice_id).strip()
+
+    # Chuẩn hóa kiểu dữ liệu date cho Cassandra DateType
+    if issue_date is None:
+        in_date = date.today()
+    elif isinstance(issue_date, str):
+        try:
+            in_date = datetime.strptime(issue_date.strip(), "%Y-%m-%d").date()
+        except ValueError:
+            in_date = date.today()
+    elif isinstance(issue_date, datetime):
+        in_date = issue_date.date()
+    else:
+        in_date = issue_date
+
+    try:
+        amount = Decimal(str(total_amount))
+    except Exception:
+        amount = Decimal("0")
+
+    guest_name_str = str(guest_name).strip() if guest_name else ""
+    hotel_id_str = str(hotel_id).strip() if hotel_id else ""
+    method_str = str(payment_method).strip() if payment_method else "CASH"
+    status_str = str(payment_status).strip() if payment_status else "PAID"
+
+    session = get_session()
+    if session:
+        try:
+            stmt = session.prepare("""
+                INSERT INTO invoices_by_booking (
+                    booking_id, invoice_id, guest_name, hotel_id,
+                    issue_date, payment_method, payment_status, total_amount
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+            """)
+            session.execute(stmt, (
+                booking_id_str,
+                invoice_id,
+                guest_name_str,
+                hotel_id_str,
+                in_date,
+                method_str,
+                status_str,
+                amount
+            ))
+            print(f"✅ [AstraDB] Đã tạo hóa đơn Q4 thành công! Mã HĐ: {invoice_id} cho Booking: {booking_id_str}")
+            return invoice_id
+        except Exception as error:
+            print(f"❌ [Lỗi tạo hóa đơn Q4 - invoices_by_booking]: {error}")
+            return None
+    else:
+        # Mock fallback khi chưa có kết nối AstraDB
+        record = {
+            "booking_id": booking_id_str,
+            "invoice_id": invoice_id,
+            "guest_name": guest_name_str,
+            "hotel_id": hotel_id_str,
+            "issue_date": in_date,
+            "payment_method": method_str,
+            "payment_status": status_str,
+            "total_amount": amount
+        }
+        _mock_invoices.append(record)
+        print(f"🔶 [MOCK MODE] Đã lưu hóa đơn tạm. Mã HĐ: {invoice_id}")
+        return invoice_id
