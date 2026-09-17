@@ -4,6 +4,7 @@
 # ====================================================================
 
 from uuid import uuid4
+from decimal import Decimal, InvalidOperation
 import re
 
 from flask import Blueprint, flash, redirect, render_template, request, url_for
@@ -87,24 +88,76 @@ def add_hotel():
 
 @hotel_bp.route('/hotels/<hotel_id>/rooms', methods=['GET'])
 def list_rooms(hotel_id):
-    """
-    TODO (Định):
-    1. Gọi hotel_service.get_rooms_by_hotel(hotel_id) (Thực hiện Query Q1)
-    2. Truyền danh sách phòng qua template rooms.html
-    """
+    """Hiển thị form thêm phòng và danh sách phòng theo khách sạn (Query Q1)."""
     rooms = hotel_service.get_rooms_by_hotel(hotel_id)
-    return render_template('rooms.html', hotel_id=hotel_id, rooms=rooms)
+    return render_template(
+        'rooms.html',
+        hotel_id=hotel_id,
+        rooms=rooms,
+        form_data={},
+        errors={},
+    )
 
 
 @hotel_bp.route('/hotels/<hotel_id>/rooms/add', methods=['POST'])
 def add_room(hotel_id):
-    """
-    TODO (Định):
-    1. Lấy dữ liệu phòng từ form (room_number, room_type, price_per_night, is_available)
-    2. Gọi hotel_service.create_room(...) để lưu
-    3. Chuyển hướng lại trang danh sách phòng
-    """
-    return redirect(url_for('hotel.list_rooms', hotel_id=hotel_id))
+    """Validate form và thêm phòng mới vào partition của khách sạn hotel_id."""
+    form_data = {
+        'room_number': request.form.get('room_number', '').strip(),
+        'room_type': request.form.get('room_type', '').strip(),
+        'price_per_night': request.form.get('price_per_night', '').strip(),
+        'is_available': request.form.get('is_available', ''),
+    }
+    field_labels = {
+        'room_number': 'Số phòng',
+        'room_type': 'Loại phòng',
+        'price_per_night': 'Giá phòng/đêm',
+    }
+    errors = {
+        field: f'{label} không được để trống.'
+        for field, label in field_labels.items()
+        if not form_data[field]
+    }
+
+    if not errors.get('price_per_night') and form_data['price_per_night']:
+        try:
+            if Decimal(form_data['price_per_night']) <= 0:
+                errors['price_per_night'] = 'Giá phòng phải lớn hơn 0.'
+        except InvalidOperation:
+            errors['price_per_night'] = 'Giá phòng phải là số hợp lệ.'
+
+    if errors:
+        flash('Vui lòng kiểm tra lại các trường bắt buộc.', 'error')
+        rooms = hotel_service.get_rooms_by_hotel(hotel_id)
+        return render_template(
+            'rooms.html',
+            hotel_id=hotel_id,
+            rooms=rooms,
+            form_data=form_data,
+            errors=errors,
+        ), 400
+
+    is_available = form_data['is_available'].strip().lower() in {'1', 'true', 'yes', 'on'}
+    created = hotel_service.create_room(
+        hotel_id,
+        form_data['room_number'],
+        form_data['room_type'],
+        form_data['price_per_night'],
+        is_available,
+    )
+    if created:
+        flash(f'Đã thêm phòng {form_data["room_number"]} thành công.', 'success')
+        return redirect(url_for('hotel.list_rooms', hotel_id=hotel_id))
+
+    flash('Không thể thêm phòng. Vui lòng kiểm tra kết nối Astra DB.', 'error')
+    rooms = hotel_service.get_rooms_by_hotel(hotel_id)
+    return render_template(
+        'rooms.html',
+        hotel_id=hotel_id,
+        rooms=rooms,
+        form_data=form_data,
+        errors={},
+    ), 503
 
 
 # --------------------------------------------------------------------
