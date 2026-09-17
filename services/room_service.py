@@ -31,6 +31,20 @@ ALLOWED_TRANSITIONS = {
     "MAINTENANCE": {"AVAILABLE"},
 }
 
+# Hành động THỦ CÔNG mà nhân viên được phép bấm trên trang chi tiết phòng.
+# LƯU Ý QUAN TRỌNG: "Đang cho thuê" (AVAILABLE -> OCCUPIED) KHÔNG nằm trong danh
+# sách này — nhân viên không được tự tay đánh dấu phòng đang cho thuê, vì trạng
+# thái này phải là HỆ QUẢ TỰ ĐỘNG của một booking thật (khách nhận phòng), không
+# phải lựa chọn thủ công. Transition này vẫn được phép ở ALLOWED_TRANSITIONS phía
+# trên và change_room_status() vẫn xử lý được — để module Đặt phòng (booking_service.py,
+# phụ trách bởi Quân) có thể tự động gọi change_room_status(hotel_id, room_number,
+# 'OCCUPIED') ngay sau khi tạo booking thành công, chứ không lộ ra UI cho lễ tân.
+MANUAL_STATUS_ACTIONS = {
+    "AVAILABLE": {"MAINTENANCE"},
+    "OCCUPIED": {"AVAILABLE"},
+    "MAINTENANCE": {"AVAILABLE"},
+}
+
 # Nhãn hành động hiển thị cho từng cặp chuyển trạng thái (dùng cho nút bấm ở trang chi tiết)
 STATUS_ACTION_LABELS = {
     ("AVAILABLE", "OCCUPIED"): "Đánh dấu đang cho thuê",
@@ -41,10 +55,14 @@ STATUS_ACTION_LABELS = {
 
 
 def get_status_actions(current_status):
-    """Danh sách (status_value, nhãn nút) các hành động chuyển trạng thái hợp lệ từ trạng thái hiện tại."""
+    """
+    Danh sách (status_value, nhãn nút) các hành động THỦ CÔNG nhân viên được bấm
+    từ trạng thái hiện tại — dùng MANUAL_STATUS_ACTIONS (không phải ALLOWED_TRANSITIONS)
+    nên "Đánh dấu đang cho thuê" sẽ không bao giờ xuất hiện trên UI.
+    """
     return [
         (target, STATUS_ACTION_LABELS.get((current_status, target), f"Chuyển sang {ROOM_STATUS_LABELS[target]}"))
-        for target in ALLOWED_TRANSITIONS.get(current_status, set())
+        for target in MANUAL_STATUS_ACTIONS.get(current_status, set())
     ]
 
 
