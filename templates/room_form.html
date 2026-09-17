@@ -32,15 +32,15 @@
             </div>
             {% endif %}
 
-            <div>
+            <div class="relative" data-combobox>
                 <label for="room-type" class="block text-sm font-medium text-slate-700">Loại phòng <span class="text-red-600" aria-hidden="true">*</span></label>
-                <input id="room-type" name="room_type" type="text" required maxlength="50" list="room-type-options" value="{{ form_data.get('room_type', '') }}" aria-describedby="room-type-error" class="mt-1.5 min-h-11 w-full rounded-xl border {% if errors.get('room_type') %}border-red-400 bg-red-50{% else %}border-slate-300 bg-white{% endif %} px-3.5 py-2.5 text-slate-900 outline-none transition placeholder:text-slate-400 focus-visible:border-cyan-600 focus-visible:ring-2 focus-visible:ring-cyan-200" placeholder="Standard, Deluxe, Suite...">
-                <datalist id="room-type-options">
-                    <option value="Standard"></option>
-                    <option value="Deluxe"></option>
-                    <option value="Suite"></option>
-                    <option value="VIP"></option>
-                </datalist>
+                <input id="room-type" name="room_type" type="text" required maxlength="50" autocomplete="off" value="{{ form_data.get('room_type', '') }}" aria-describedby="room-type-error" class="mt-1.5 min-h-11 w-full rounded-xl border {% if errors.get('room_type') %}border-red-400 bg-red-50{% else %}border-slate-300 bg-white{% endif %} px-3.5 py-2.5 text-slate-900 outline-none transition placeholder:text-slate-400 focus-visible:border-cyan-600 focus-visible:ring-2 focus-visible:ring-cyan-200" placeholder="Standard, Deluxe, Suite...">
+                <ul class="combobox-options hidden absolute z-10 mt-1 w-full max-h-52 overflow-auto rounded-xl border border-slate-200 bg-white shadow-lg py-1 text-sm" role="listbox">
+                    <li class="px-3.5 py-2 cursor-pointer hover:bg-cyan-50" data-value="Standard">Standard</li>
+                    <li class="px-3.5 py-2 cursor-pointer hover:bg-cyan-50" data-value="Deluxe">Deluxe</li>
+                    <li class="px-3.5 py-2 cursor-pointer hover:bg-cyan-50" data-value="Suite">Suite</li>
+                    <li class="px-3.5 py-2 cursor-pointer hover:bg-cyan-50" data-value="VIP">VIP</li>
+                </ul>
                 {% if errors.get('room_type') %}<p id="room-type-error" class="mt-1.5 text-sm text-red-600">{{ errors.room_type }}</p>{% endif %}
             </div>
 
@@ -50,15 +50,15 @@
                     <input id="room-capacity" name="capacity" type="number" required min="1" step="1" value="{{ form_data.get('capacity', '') }}" aria-describedby="room-capacity-error" class="mt-1.5 min-h-11 w-full rounded-xl border {% if errors.get('capacity') %}border-red-400 bg-red-50{% else %}border-slate-300 bg-white{% endif %} px-3.5 py-2.5 text-slate-900 outline-none transition placeholder:text-slate-400 focus-visible:border-cyan-600 focus-visible:ring-2 focus-visible:ring-cyan-200" placeholder="2">
                     {% if errors.get('capacity') %}<p id="room-capacity-error" class="mt-1.5 text-sm text-red-600">{{ errors.capacity }}</p>{% endif %}
                 </div>
-                <div>
+                <div class="relative" data-combobox>
                     <label for="room-bed-type" class="block text-sm font-medium text-slate-700">Loại giường <span class="text-red-600" aria-hidden="true">*</span></label>
-                    <input id="room-bed-type" name="bed_type" type="text" required maxlength="50" list="bed-type-options" value="{{ form_data.get('bed_type', '') }}" aria-describedby="room-bed-type-error" class="mt-1.5 min-h-11 w-full rounded-xl border {% if errors.get('bed_type') %}border-red-400 bg-red-50{% else %}border-slate-300 bg-white{% endif %} px-3.5 py-2.5 text-slate-900 outline-none transition placeholder:text-slate-400 focus-visible:border-cyan-600 focus-visible:ring-2 focus-visible:ring-cyan-200" placeholder="Giường đôi">
-                    <datalist id="bed-type-options">
-                        <option value="Giường đơn"></option>
-                        <option value="Giường đôi"></option>
-                        <option value="2 giường đơn"></option>
-                        <option value="Giường đôi + Giường đơn"></option>
-                    </datalist>
+                    <input id="room-bed-type" name="bed_type" type="text" required maxlength="50" autocomplete="off" value="{{ form_data.get('bed_type', '') }}" aria-describedby="room-bed-type-error" class="mt-1.5 min-h-11 w-full rounded-xl border {% if errors.get('bed_type') %}border-red-400 bg-red-50{% else %}border-slate-300 bg-white{% endif %} px-3.5 py-2.5 text-slate-900 outline-none transition placeholder:text-slate-400 focus-visible:border-cyan-600 focus-visible:ring-2 focus-visible:ring-cyan-200" placeholder="Giường đôi">
+                    <ul class="combobox-options hidden absolute z-10 mt-1 w-full max-h-52 overflow-auto rounded-xl border border-slate-200 bg-white shadow-lg py-1 text-sm" role="listbox">
+                        <li class="px-3.5 py-2 cursor-pointer hover:bg-cyan-50" data-value="Giường đơn">Giường đơn</li>
+                        <li class="px-3.5 py-2 cursor-pointer hover:bg-cyan-50" data-value="Giường đôi">Giường đôi</li>
+                        <li class="px-3.5 py-2 cursor-pointer hover:bg-cyan-50" data-value="2 giường đơn">2 giường đơn</li>
+                        <li class="px-3.5 py-2 cursor-pointer hover:bg-cyan-50" data-value="Giường đôi + Giường đơn">Giường đôi + Giường đơn</li>
+                    </ul>
                     {% if errors.get('bed_type') %}<p id="room-bed-type-error" class="mt-1.5 text-sm text-red-600">{{ errors.bed_type }}</p>{% endif %}
                 </div>
             </div>
@@ -81,4 +81,33 @@
         </form>
     </div>
 </section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Combobox tự viết: luôn hiện đủ gợi ý khi bấm/focus vào ô, kể cả khi ô đã có giá trị
+    // (khắc phục hạn chế của <datalist> gốc: chỉ hiện gợi ý khớp với text đang gõ).
+    document.querySelectorAll('[data-combobox]').forEach(function (wrapper) {
+        const input = wrapper.querySelector('input');
+        const list = wrapper.querySelector('.combobox-options');
+        if (!input || !list) return;
+
+        function openList() { list.classList.remove('hidden'); }
+        function closeList() { list.classList.add('hidden'); }
+
+        input.addEventListener('focus', openList);
+        input.addEventListener('click', openList);
+        input.addEventListener('blur', function () { setTimeout(closeList, 150); });
+
+        list.querySelectorAll('li').forEach(function (item) {
+            // mousedown thay vì click: chạy TRƯỚC khi input bị blur, tránh việc closeList chạy trước khi kịp gán giá trị
+            item.addEventListener('mousedown', function (e) {
+                e.preventDefault();
+                input.value = item.dataset.value;
+                closeList();
+                input.focus();
+            });
+        });
+    });
+</script>
 {% endblock %}
