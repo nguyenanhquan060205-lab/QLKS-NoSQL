@@ -21,10 +21,10 @@ class HotelRoutesTest(unittest.TestCase):
         get_all_hotels.return_value = [
             SimpleNamespace(
                 hotel_id="H001",
-                name="Ocean View Hotel",
-                phone="0901234567",
-                address="1 Đường Biển",
-                city="Đà Nẵng",
+                name="Mường Thanh Luxury Đà Nẵng",
+                phone="0236395678",
+                address="270 Võ Nguyên Giáp",
+                city="Thành phố Đà Nẵng",
                 country="Vietnam",
                 amenities={"Wifi", "Hồ bơi"},
             )
@@ -33,7 +33,7 @@ class HotelRoutesTest(unittest.TestCase):
         response = self.client.get("/hotels")
 
         self.assertEqual(response.status_code, 200)
-        self.assertIn("Ocean View Hotel", response.get_data(as_text=True))
+        self.assertIn("Mường Thanh Luxury Đà Nẵng", response.get_data(as_text=True))
         self.assertIn("/hotels/H001/rooms", response.get_data(as_text=True))
 
     @patch("routes.hotel_routes.hotel_service.get_all_hotels", return_value=[])
@@ -42,10 +42,10 @@ class HotelRoutesTest(unittest.TestCase):
         response = self.client.post(
             "/hotels/add",
             data={
-                "name": "Ocean View Hotel",
+                "name": "Mường Thanh Luxury Đà Nẵng",
                 "phone": "0901234567",
-                "address": "1 Đường Biển",
-                "city": "Đà Nẵng",
+                "address": "270 Võ Nguyên Giáp",
+                "city": "Thành phố Đà Nẵng",
                 "country": "Vietnam",
                 "amenities": "Wifi, Hồ bơi",
             },
@@ -58,10 +58,10 @@ class HotelRoutesTest(unittest.TestCase):
         parameters = create_hotel.call_args.args
         self.assertRegex(parameters[0], r"^H[A-F0-9]{8}$")
         self.assertEqual(parameters[1:], (
-            "Ocean View Hotel",
+            "Mường Thanh Luxury Đà Nẵng",
             "0901234567",
-            "1 Đường Biển",
-            "Đà Nẵng",
+            "270 Võ Nguyên Giáp",
+            "Thành phố Đà Nẵng",
             "Vietnam",
             "Wifi, Hồ bơi",
         ))
@@ -84,6 +84,60 @@ class HotelRoutesTest(unittest.TestCase):
         self.assertIn("Tên khách sạn không được để trống", response.get_data(as_text=True))
         create_hotel.assert_not_called()
 
+    @patch("routes.hotel_routes.hotel_service.get_all_hotels", return_value=[])
+    @patch("routes.hotel_routes.hotel_service.create_hotel")
+    def test_add_hotel_rejects_invalid_phone_number(self, create_hotel, _):
+        response = self.client.post(
+            "/hotels/add",
+            data={
+                "name": "Mường Thanh Test",
+                "phone": "12345",
+                "address": "1 Đường Biển",
+                "city": "Đà Nẵng",
+                "country": "Vietnam",
+            },
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("Số điện thoại phải gồm đúng 10 chữ số", response.get_data(as_text=True))
+        create_hotel.assert_not_called()
+
+    @patch("routes.hotel_routes.hotel_service.update_hotel", return_value=True)
+    def test_edit_hotel_calls_service_and_redirects(self, update_hotel):
+        response = self.client.post(
+            "/hotels/H001/edit",
+            data={
+                "name": "Mường Thanh Luxury Đà Nẵng Mới",
+                "phone": "0901234567",
+                "address": "270 Võ Nguyên Giáp",
+                "city": "Thành phố Đà Nẵng",
+                "country": "Vietnam",
+                "amenities": "Wifi, Spa",
+            },
+            follow_redirects=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        update_hotel.assert_called_once_with(
+            "H001",
+            "Mường Thanh Luxury Đà Nẵng Mới",
+            "0901234567",
+            "270 Võ Nguyên Giáp",
+            "Thành phố Đà Nẵng",
+            "Vietnam",
+            "Wifi, Spa",
+        )
+
+    @patch("routes.hotel_routes.hotel_service.delete_hotel", return_value=True)
+    def test_delete_hotel_calls_service_and_redirects(self, delete_hotel):
+        response = self.client.post(
+            "/hotels/H001/delete",
+            follow_redirects=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        delete_hotel.assert_called_once_with("H001")
+
     @patch("routes.hotel_routes.hotel_service.get_all_guests")
     def test_list_guests_renders_database_rows(self, get_all_guests):
         get_all_guests.return_value = [
@@ -93,6 +147,7 @@ class HotelRoutesTest(unittest.TestCase):
                 email="an@example.com",
                 phone="0912345678",
                 id_card="079201001234",
+                address="123 Nguyễn Thị Minh Khai, Đà Nẵng",
             )
         ]
 
@@ -101,7 +156,7 @@ class HotelRoutesTest(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         body = response.get_data(as_text=True)
         self.assertIn("Nguyễn Văn An", body)
-        self.assertIn("/bookings/guest/G001", body)
+        self.assertIn("123 Nguyễn Thị Minh Khai", body)
 
     @patch("routes.hotel_routes.hotel_service.get_all_guests", return_value=[])
     @patch("routes.hotel_routes.hotel_service.create_guest", return_value=True)
@@ -113,6 +168,7 @@ class HotelRoutesTest(unittest.TestCase):
                 "email": "an@example.com",
                 "phone": "0912345678",
                 "id_card": "079201001234",
+                "address": "Hà Nội",
             },
             follow_redirects=True,
         )
@@ -127,41 +183,187 @@ class HotelRoutesTest(unittest.TestCase):
             "an@example.com",
             "0912345678",
             "079201001234",
+            "Hà Nội",
         ))
 
     @patch("routes.hotel_routes.hotel_service.get_all_guests", return_value=[])
     @patch("routes.hotel_routes.hotel_service.create_guest")
-    def test_add_guest_rejects_invalid_email(self, create_guest, _):
+    def test_add_guest_rejects_invalid_phone(self, create_guest, _):
         response = self.client.post(
             "/guests/add",
             data={
                 "full_name": "Nguyễn Văn An",
-                "email": "an@@example.com",
-                "phone": "0912345678",
+                "email": "an@example.com",
+                "phone": "0912345",
                 "id_card": "079201001234",
             },
         )
 
         self.assertEqual(response.status_code, 400)
-        self.assertIn("Email chưa đúng định dạng", response.get_data(as_text=True))
+        self.assertIn("Số điện thoại phải gồm đúng 10 chữ số", response.get_data(as_text=True))
         create_guest.assert_not_called()
 
-    @patch("routes.hotel_routes.hotel_service.get_all_hotels", return_value=[])
-    @patch("routes.hotel_routes.hotel_service.create_hotel", return_value=False)
-    def test_add_hotel_returns_503_when_database_write_fails(self, _, __):
+    @patch("routes.hotel_routes.hotel_service.update_guest", return_value=True)
+    def test_edit_guest_calls_service_and_redirects(self, update_guest):
+        response = self.client.post(
+            "/guests/G001/edit",
+            data={
+                "full_name": "Nguyễn Văn An Mới",
+                "email": "an.new@example.com",
+                "phone": "0912345678",
+                "id_card": "079201001234",
+                "address": "Đà Nẵng",
+            },
+            follow_redirects=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        update_guest.assert_called_once_with(
+            "G001",
+            "Nguyễn Văn An Mới",
+            "an.new@example.com",
+            "0912345678",
+            "079201001234",
+            "Đà Nẵng",
+        )
+
+    @patch("routes.hotel_routes.hotel_service.delete_guest", return_value=True)
+    def test_delete_guest_calls_service_and_redirects(self, delete_guest):
+        response = self.client.post(
+            "/guests/G001/delete",
+            follow_redirects=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        delete_guest.assert_called_once_with("G001")
+
+    def test_api_provinces_returns_json_list(self):
+        response = self.client.get("/api/provinces")
+        self.assertEqual(response.status_code, 200)
+        data = response.get_json()
+        self.assertIsInstance(data, list)
+        self.assertGreater(len(data), 0)
+
+    @patch("routes.hotel_routes.hotel_service.get_all_hotels")
+    @patch("routes.hotel_routes.hotel_service.create_hotel")
+    def test_add_hotel_rejects_duplicate_name(self, create_hotel, get_all_hotels):
+        get_all_hotels.return_value = [
+            SimpleNamespace(hotel_id="H001", name="Mường Thanh Luxury Đà Nẵng")
+        ]
         response = self.client.post(
             "/hotels/add",
             data={
-                "name": "Ocean View Hotel",
+                "name": "mường thanh luxury đà nẵng",
                 "phone": "0901234567",
-                "address": "1 Đường Biển",
+                "address": "123 Đường Biển",
                 "city": "Đà Nẵng",
                 "country": "Vietnam",
             },
         )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("đã tồn tại trong hệ thống", response.get_data(as_text=True))
+        create_hotel.assert_not_called()
 
-        self.assertEqual(response.status_code, 503)
-        self.assertIn("Không thể thêm khách sạn", response.get_data(as_text=True))
+    @patch("routes.hotel_routes.hotel_service.get_all_guests", return_value=[])
+    @patch("routes.hotel_routes.hotel_service.create_guest")
+    def test_add_guest_rejects_invalid_id_card(self, create_guest, _):
+        # Từ chối CMND 9 chữ số cũ (hệ thống hiện tại chỉ dùng CCCD 12 số và Hộ chiếu)
+        res_cmnd = self.client.post(
+            "/guests/add",
+            data={
+                "full_name": "Nguyễn Văn An",
+                "email": "an@example.com",
+                "phone": "0912345678",
+                "id_card": "123456789",
+            },
+        )
+        self.assertEqual(res_cmnd.status_code, 400)
+        self.assertIn("Số CCCD phải gồm đúng 12 chữ số", res_cmnd.get_data(as_text=True))
+
+        # Từ chối chuỗi ký tự sai định dạng
+        response = self.client.post(
+            "/guests/add",
+            data={
+                "full_name": "Nguyễn Văn An",
+                "email": "an@example.com",
+                "phone": "0912345678",
+                "id_card": "12345",
+            },
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("Số CCCD phải gồm đúng 12 chữ số", response.get_data(as_text=True))
+        create_guest.assert_not_called()
+
+    @patch("routes.hotel_routes.hotel_service.get_all_guests", return_value=[])
+    @patch("routes.hotel_routes.hotel_service.create_guest", return_value=True)
+    def test_add_guest_accepts_passport(self, create_guest, _):
+        response = self.client.post(
+            "/guests/add",
+            data={
+                "full_name": "John Doe",
+                "email": "john@example.com",
+                "phone": "0987654321",
+                "id_card": "b1234567",
+            },
+            follow_redirects=False,
+        )
+        self.assertEqual(response.status_code, 302)
+        create_guest.assert_called_once()
+        # Xác nhận Hộ chiếu được tự động viết hoa
+        args, _ = create_guest.call_args
+        self.assertEqual(args[4], "B1234567")
+
+    @patch("routes.hotel_routes.hotel_service.get_all_guests")
+    @patch("routes.hotel_routes.hotel_service.create_guest")
+    def test_add_guest_rejects_duplicate_id_card_or_email_or_phone(self, create_guest, get_all_guests):
+        get_all_guests.return_value = [
+            SimpleNamespace(
+                guest_id="G001",
+                full_name="Khách cũ",
+                email="cu@example.com",
+                phone="0911111111",
+                id_card="079201001234",
+            )
+        ]
+        # Trùng CCCD
+        res1 = self.client.post(
+            "/guests/add",
+            data={
+                "full_name": "Khách Mới",
+                "email": "moi@example.com",
+                "phone": "0922222222",
+                "id_card": "079201001234",
+            },
+        )
+        self.assertEqual(res1.status_code, 400)
+        self.assertIn("đã được đăng ký cho khách hàng khác", res1.get_data(as_text=True))
+
+        # Trùng Email
+        res2 = self.client.post(
+            "/guests/add",
+            data={
+                "full_name": "Khách Mới",
+                "email": "cu@example.com",
+                "phone": "0922222222",
+                "id_card": "079201009999",
+            },
+        )
+        self.assertEqual(res2.status_code, 400)
+        self.assertIn("đã tồn tại trong hệ thống", res2.get_data(as_text=True))
+
+        # Trùng Phone
+        res3 = self.client.post(
+            "/guests/add",
+            data={
+                "full_name": "Khách Mới",
+                "email": "moi@example.com",
+                "phone": "0911111111",
+                "id_card": "079201009999",
+            },
+        )
+        self.assertEqual(res3.status_code, 400)
+        self.assertIn("đã được đăng ký cho khách hàng khác", res3.get_data(as_text=True))
+        create_guest.assert_not_called()
 
 
 if __name__ == "__main__":

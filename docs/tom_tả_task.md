@@ -183,6 +183,150 @@ Acceptance Criteria: người dùng thêm được khách sạn và khách hàng
 
 Cả 7 route test và 2 integration test đều đạt. Toàn bộ test suite sau QLKS-06 có 22 test và tất cả đều `OK`. QLKS-06 đáp ứng đầy đủ Acceptance Criteria và có thể chuyển sang trạng thái **Done**.
 
+---
+
+## Task Nâng Cấp Hoàn Thiện: Toàn Bộ Luồng Hoạt Động Của Định (Cập nhật ngày 17/09/2026)
+
+### 1. Phân định trách nhiệm trên Jira (Jira Sprint Backlog)
+- **Định phụ trách chính (9 Story Points)**:
+  - `QLKS-04`: Viết Service CQL cho `hotels` và `guests` (`services/hotel_service.py`).
+  - `QLKS-05`: Viết Service CQL Query Q1 tìm phòng theo khách sạn (`services/room_service.py`).
+  - `QLKS-06`: Dựng Route & Giao diện Khách sạn & Khách hàng (`routes/hotel_routes.py`, `templates/hotels.html`, `templates/guests.html`).
+  - Module nạp & chuẩn hóa 34 tỉnh thành và phường/xã (`services/location_service.py`, `docs/provinces.json`).
+- **Phần của bạn Như**: `QLKS-01` (AstraDB DDL), `QLKS-02` (db.py), `QLKS-03` (base.html), `QLKS-07` (Quản lý Phòng `rooms.html`), `QLKS-12` (Dashboard) — *Định và AI không can thiệp*.
+- **Phần của bạn Quân**: `QLKS-08` (BATCH INSERT Q5), `QLKS-09` (Tra cứu Q2/Q3), `QLKS-10` (Hóa đơn Q4), `QLKS-11` (Giao diện Đặt phòng/Hóa đơn) — *Định và AI không can thiệp*.
+
+---
+
+### 2. Sơ Đồ Tổng Quan Luồng Hoạt Động (Architecture Flow)
+
+```mermaid
+flowchart TD
+    subgraph UI["🌐 Giao Diện Người Dùng (templates)"]
+        H_List["Click 'Khách sạn' trên Navbar"]
+        H_Add["Submit Form '+ Thêm khách sạn mới'"]
+        H_Edit["Click nút '[Sửa]' trên dòng KS"]
+        H_Del["Click nút '[Xóa]' trên dòng KS"]
+        G_List["Click 'Khách hàng' trên Navbar"]
+        G_Add["Submit Form '+ Thêm khách hàng mới'"]
+        G_Edit["Click nút '[Sửa]' trên dòng Khách"]
+        G_Del["Click nút '[Xóa]' trên dòng Khách"]
+    end
+
+    subgraph ROUTE["🛣️ Tầng Điều Hướng (routes/hotel_routes.py)"]
+        R_H_List["GET /hotels\nlist_hotels()"]
+        R_H_Add["POST /hotels/add\nadd_hotel()"]
+        R_H_Edit["POST /hotels/<id>/edit\nedit_hotel()"]
+        R_H_Del["POST /hotels/<id>/delete\ndelete_hotel()"]
+        R_G_List["GET /guests\nlist_guests()"]
+        R_G_Add["POST /guests/add\nadd_guest()"]
+        R_G_Edit["POST /guests/<id>/edit\nedit_guest()"]
+        R_G_Del["POST /guests/<id>/delete\ndelete_guest()"]
+        R_Prov["GET /api/provinces/<code_tinh>/wards\nget_wards_api()"]
+    end
+
+    subgraph SERVICE["⚙️ Tầng Dịch Vụ (services)"]
+        S_H_Get["hotel_service.get_all_hotels()"]
+        S_H_Cre["hotel_service.create_hotel(...)"]
+        S_H_Upd["hotel_service.update_hotel(...)"]
+        S_H_Del["hotel_service.delete_hotel(...)"]
+        S_G_Get["hotel_service.get_all_guests()"]
+        S_G_Cre["hotel_service.create_guest(...)"]
+        S_G_Upd["hotel_service.update_guest(...)"]
+        S_G_Del["hotel_service.delete_guest(...)"]
+        S_Loc["location_service.get_wards_by_province(...)"]
+    end
+
+    subgraph DB["🗄️ Cơ Sở Dữ Liệu Cassandra / AstraDB"]
+        CQL_H_Sel["SELECT * FROM hotels;"]
+        CQL_H_Ins["INSERT INTO hotels (...) VALUES (...);"]
+        CQL_H_Upd["UPDATE hotels SET ... WHERE hotel_id = ?;"]
+        CQL_H_Del["DELETE FROM rooms_by_hotel WHERE hotel_id = ?;\nDELETE FROM hotels WHERE hotel_id = ?;"]
+        CQL_G_Sel["SELECT * FROM guests;"]
+        CQL_G_Ins["INSERT INTO guests (...) VALUES (...);"]
+        CQL_G_Upd["UPDATE guests SET ... WHERE guest_id = ?;"]
+        CQL_G_Del["DELETE FROM guests WHERE guest_id = ?;"]
+    end
+
+    H_List --> R_H_List --> S_H_Get --> CQL_H_Sel
+    H_Add --> R_H_Add --> S_H_Cre --> CQL_H_Ins
+    H_Edit --> R_H_Edit --> S_H_Upd --> CQL_H_Upd
+    H_Del --> R_H_Del --> S_H_Del --> CQL_H_Del
+    G_List --> R_G_List --> S_G_Get --> CQL_G_Sel
+    G_Add --> R_G_Add --> S_G_Cre --> CQL_G_Ins
+    G_Edit --> R_G_Edit --> S_G_Upd --> CQL_G_Upd
+    G_Del --> R_G_Del --> S_G_Del --> CQL_G_Del
+```
+
+---
+
+### 3. Chi Tiết Từng Luồng Nghiệp Vụ Khi Thao Tác (Action Step-by-Step)
+
+#### 📍 Luồng 1: Xem danh sách Khách sạn (`GET /hotels`)
+1. **Thao tác**: Người dùng bấm **"Khách sạn"** trên thanh điều hướng Navbar.
+2. **Route tiếp nhận**: `GET /hotels` chạy hàm `list_hotels()` trong `routes/hotel_routes.py`.
+3. **Truy vấn dữ liệu**:
+   - `hotel_service.get_all_hotels()`: Thực thi `SELECT hotel_id, name, phone, address, city, country, amenities FROM hotels;`.
+   - `location_service.get_all_provinces()`: Lấy danh sách 34 tỉnh thành đã chuẩn hóa tên gọn gàng (`clean_name`).
+4. **Render giao diện**: [hotels.html](file:///c:/Users/Admin/Documents/Taiieu/nosql/QLKS-NoSQL/templates/hotels.html) hiển thị:
+   - **Thẻ KPI Thống kê**: Tổng khách sạn, số tỉnh thành có cơ sở.
+   - **Thanh tìm kiếm & lọc**: Tìm kiếm realtime theo tên, SĐT, địa chỉ hoặc lọc theo tỉnh thành mà không reload trang.
+   - **Bảng Full-Width**: Rộng rãi 100%, khắc phục hoàn toàn tình trạng bảng bị bóp hẹp gây thanh cuộn ngang ở phiên bản cũ. Các nút "Phòng", "Sửa", "Xóa" hiển thị rõ ràng.
+
+#### 📍 Luồng 2: Thêm mới Khách sạn (`POST /hotels/add`)
+1. **Thao tác**: Người dùng bấm nút **"+ Thêm khách sạn mới"** ➡️ Modal Dialog mở ra.
+2. **Điền biểu mẫu**:
+   - **Tên khách sạn**: Ô nhập tự do, không còn dropdown gợi ý cứng (bỏ datalist ngoài DB). **Chặn trùng lặp**: Nếu tên khách sạn đã tồn tại trong DB, hệ thống lập tức báo lỗi đỏ: *"Tên khách sạn đã tồn tại trong hệ thống."*.
+   - **Số điện thoại**: Ràng buộc đúng 10 chữ số, bắt đầu bằng `0` (Frontend: `pattern="0[0-9]{9}"`, Backend: `is_valid_phone()`).
+   - **Tỉnh / Thành phố**: Lấy từ `provinces.json`, đã bỏ hậu tố rườm rà `(Thành phố Trung Ương)` và `(Tỉnh)`, hiển thị tên ngắn gọn: `Hà Nội`, `Hồ Chí Minh`, `Đà Nẵng`, `Cao Bằng`...
+   - **Xã / Phường**: Tự động gọi API `GET /api/provinces/<pCode>/wards` nạp danh sách xã/phường tương ứng. Tên xã được đưa lên đầu (`Dầu Tiếng (Xã)`, `Bến Cát (Phường)`). Hỗ trợ phím gõ nhanh thông minh: gõ chữ cái đầu ("D", "B", "M"...) là nhảy ngay đến xã/phường cần chọn.
+   - **Địa chỉ chi tiết**: Số nhà, tên đường. Khi lưu, hệ thống tự động ghép với Xã/Phường: `address = f"{raw_address}, {ward}"`.
+   - **Tiện nghi**: Tích chọn trực quan từ 12 checkbox pills có icon sinh động + ô nhập tiện nghi tùy chỉnh.
+   - **Quốc gia**: Đã bỏ trên UI, backend tự động gán mặc định `'Vietnam'`.
+3. **Xử lý Backend & Cassandra**:
+   - Nhấn **"Thêm khách sạn"** ➡️ Gửi `POST /hotels/add`.
+   - Kiểm tra validation: Nếu lỗi hoặc trùng tên, giữ nguyên modal và hiển thị thông báo đỏ dưới từng ô nhập.
+   - Tự động sinh mã khách sạn duy nhất: `hotel_id = f'H{uuid4().hex[:8].upper()}'` (Chuẩn 9 ký tự, ví dụ: `H3F8A1B2`).
+   - Gọi `hotel_service.create_hotel(...)`: Chuẩn hóa `amenities` thành `set<text>` và chạy prepared statement `INSERT INTO hotels (...) VALUES (?, ?, ?, ?, ?, ?, ?);`.
+   - Flash thông báo thành công và redirect về `GET /hotels`.
+
+#### 📍 Luồng 3: Chỉnh sửa Khách sạn (`POST /hotels/<hotel_id>/edit`)
+1. **Thao tác**: Bấm nút **"[Sửa]"** trên dòng khách sạn ➡️ Modal Edit mở ra với đầy đủ thông tin hiện tại.
+2. `hotel_id` được giữ nguyên cố định (Partition Key trong Cassandra không thể thay đổi).
+3. Người dùng cập nhật tên, số điện thoại, chọn lại Tỉnh ➡️ tự nạp lại Xã/Phường, tích chọn lại tiện nghi.
+4. Bấm **"Lưu thay đổi"** ➡️ Gửi `POST /hotels/<hotel_id>/edit`:
+   - Kiểm tra tên khách sạn mới không được trùng với các khách sạn khác đang có.
+   - Gọi `hotel_service.update_hotel(hotel_id, name, phone, address, city, country, amenities)`.
+   - Cassandra thực thi câu lệnh prepared: `UPDATE hotels SET name = ?, phone = ?, address = ?, city = ?, country = ?, amenities = ? WHERE hotel_id = ?;`.
+   - Flash thông báo thành công và cập nhật lại bảng danh sách.
+
+#### 📍 Luồng 4: Xóa Khách sạn (`POST /hotels/<hotel_id>/delete`)
+1. **Thao tác**: Bấm nút **"[Xóa]"** màu đỏ ➡️ Modal xác nhận mở ra hiển thị tên khách sạn cần xóa.
+2. **Xử lý Backend**:
+   - Gửi `POST /hotels/<hotel_id>/delete`.
+   - Hàm `hotel_service.delete_hotel(hotel_id)` tự động xóa sạch các phòng thuộc partition khách sạn đó trước: `DELETE FROM rooms_by_hotel WHERE hotel_id = ?;`.
+   - Sau đó xóa bản ghi trong bảng `hotels`: `DELETE FROM hotels WHERE hotel_id = ?;`.
+   - Redirect về trang danh sách kèm flash thông báo.
+
+#### 📍 Luồng 5: Quản lý Khách hàng (`GET /guests`, Full CRUD)
+- **Xem danh sách**: `GET /guests` ➡️ `hotel_service.get_all_guests()`.
+- **Ràng buộc định dạng CCCD / Hộ chiếu**: Loại bỏ CMND cũ (9 số). Chỉ chấp nhận **CCCD** gồm đúng 12 chữ số (`^\d{12}$`) hoặc **Hộ chiếu** gồm 1 chữ cái và 7-8 số (`^[A-Za-z]\d{7,8}$`, ví dụ: `B1234567`).
+- **Chặn trùng lặp đa trường**:
+  - Không cho phép trùng **Số CCCD / Hộ chiếu** (`id_card`) giữa các khách hàng (chuẩn hóa chữ hoa không phân biệt hoa thường).
+  - Không cho phép trùng **Email** (`email`) giữa các khách hàng.
+  - Không cho phép trùng **Số điện thoại** (`phone`) giữa các khách hàng.
+- **Thêm mới**: `POST /guests/add` ➡️ Modal thêm khách, ràng buộc SĐT 10 số (bắt đầu bằng 0), CCCD 12 số / Hộ chiếu, kiểm tra trùng lặp, chọn tỉnh/xã động, tự sinh mã `G{uuid4().hex[:8].upper()}`.
+- **Hỗ trợ trường Địa chỉ cư trú (`address`)**: Tự động fallback an toàn nếu AstraDB chưa chạy migration `ALTER TABLE guests ADD address text;`.
+- **Sửa & Xóa**: `POST /guests/<guest_id>/edit` và `POST /guests/<guest_id>/delete` qua Modal xác nhận (cũng kiểm tra chặn trùng với khách hàng khác khi sửa).
+
+#### 📍 Luồng 6: Quản lý Phòng (`GET /hotels/<hotel_id>/rooms`)
+- Tự động lấy tên khách sạn thực tế từ cơ sở dữ liệu (`hotel_service.get_hotel_by_id(hotel_id)`).
+- Tích hợp bộ chuyển đổi khách sạn nhanh (Hotel Switcher Dropdown).
+- Giao diện `rooms.html` đã được bàn giao cho bạn **Như** theo ticket `QLKS-07` trên Jira.
+- Bộ kiểm thử tự động đạt: **30/30 unit tests pass (100% OK)**.
+
+---
+
 ## 3. Kiến trúc và luồng xử lý
 
 Luồng request đi qua các thành phần như sau:
