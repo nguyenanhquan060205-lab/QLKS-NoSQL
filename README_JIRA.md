@@ -4,8 +4,8 @@
 > **Mục tiêu & Hạn chót (Hard Deadline):** **24h00 Thứ Năm (17/09/2026)** — Toàn bộ chức năng, kiểm thử, chụp ảnh demo và đóng gói mã nguồn phải hoàn tất trước 24h00 Thứ Năm để sáng Thứ Sáu (18/09) sẵn sàng nộp bài / thuyết trình.  
 > **Phương pháp:** Agile / Scrum - Sprint 4 ngày.  
 > **Đội ngũ (3 thành viên):**  
-> - 👤 **Như** (Hạ tầng Database AstraDB, Layout Tailwind & Dashboard)  
-> - 👤 **Định** (Catalog: Khách sạn, Phòng, Khách hàng)  
+> - 👤 **Như** (Hạ tầng Database AstraDB, Layout Tailwind, Giao diện Phòng QLKS-07 & Dashboard)  
+> - 👤 **Định** (Catalog: Khách sạn, Khách hàng & Service Q1)  
 > - 👤 **Quân** (Transactions: Đặt phòng BATCH Q5, Hóa đơn Q4)
 
 ---
@@ -26,7 +26,8 @@ gantt
     Code CQL Query Q2, Q3 Lịch sử đặt phòng (Quân)     :t3_3, 2026-09-15, 1d
     Hoàn thiện Navbar & Layout Tailwind base.html (Như) :t3_4, 2026-09-15, 1d
     section Thứ 4 (16/09): Giao Diện & Kết Nối Route
-    Dựng giao diện Khách sạn, Phòng, Khách hàng (Định) :t4_1, 2026-09-16, 1d
+    Dựng giao diện Khách sạn & Khách hàng (Định)      :t4_1, 2026-09-16, 1d
+    Dựng giao diện Quản lý Phòng QLKS-07 (Như)        :t4_1_room, 2026-09-16, 1d
     Dựng giao diện Đặt phòng & Hóa đơn (Quân)          :t4_2, 2026-09-16, 1d
     Code Dashboard Thống kê & Trang chủ (Như)          :t4_3, 2026-09-16, 1d
     section Thứ 5 (17/09): TỔNG DUYỆT & ĐÓNG DEADLINE
@@ -65,7 +66,7 @@ gantt
 | **`QLKS-04`** | Viết Service CQL cho `hotels` và `guests` | **Định** | 3 SP | 🔴 High | **Thứ 3 (15/09)** | **Mô tả:** Viết hàm `get_all_hotels`, `create_hotel`, `get_all_guests`, `create_guest` trong `services/hotel_service.py`.<br>**AC:** Thêm và lấy dữ liệu thành công từ bảng `hotels` và `guests`. |
 | **`QLKS-05`** | Viết Service CQL Query Q1 (`rooms_by_hotel`) | **Định** | 3 SP | 🔴 High | **Thứ 3 (15/09)** | **Mô tả:** Viết hàm `get_rooms_by_hotel(hotel_id)` và `create_room(...)` theo Partition Key `hotel_id`.<br>**AC:** Lấy đúng danh sách phòng của khách sạn chỉ định mà không quét toàn bảng. |
 | **`QLKS-06`** | Dựng Route & Giao diện Khách sạn (`hotels.html`, `guests.html`) | **Định** | 3 SP | 🟡 Med | **Thứ 4 (16/09)** | **Mô tả:** Hoàn thiện route Flask và form thêm/bảng danh sách đẹp mắt với Tailwind CSS.<br>**AC:** Người dùng thêm được khách sạn và khách hàng mới trực tiếp trên web. |
-| **`QLKS-07`** | Dựng Route & Giao diện Quản lý Phòng (`rooms.html`) | **Định** | 2 SP | 🟡 Med | **Thứ 4 (16/09)** | **Mô tả:** Hoàn thiện trang danh sách phòng theo từng khách sạn kèm form thêm phòng mới.<br>**AC:** Bấm vào nút "Xem phòng" từ khách sạn sẽ nhảy sang đúng danh sách phòng của khách sạn đó. |
+| **`QLKS-07`** | Dựng Route & Giao diện Quản lý Phòng (`rooms.html`) | **Như** | 2 SP | 🟡 Med | **Thứ 4 (16/09)** | **Mô tả:** Hoàn thiện trang danh sách phòng theo từng khách sạn kèm form thêm phòng mới.<br>**AC:** Bấm vào nút "Xem phòng" từ khách sạn sẽ nhảy sang đúng danh sách phòng của khách sạn đó. |
 
 ---
 
@@ -95,10 +96,10 @@ gantt
 
 | Thành viên | Nhiệm vụ chính | Tổng Story Points | Trọng số công việc |
 | :--- | :--- | :---: | :---: |
-| 👤 **Định** | Catalog (Khách sạn, Phòng Q1, Khách hàng) | **11 SP** | ~31% |
-| 👤 **Quân** | Transactions (Đặt phòng BATCH Q5, Lịch sử Q2/Q3, Hóa đơn Q4) | **13 SP** | ~36% |
-| 👤 **Như** | Infrastructure (AstraDB, db.py, Base Tailwind, Dashboard) | **11 SP** | ~31% |
-| 👥 **Chung (Cả 3)** | Kiểm thử tổng thể, Chụp ảnh báo cáo & Đóng gói | **2 SP** | ~2% |
+| 👤 **Định** | Catalog Khách sạn & Khách hàng, Service Q1 | **9 SP** | ~25% |
+| 👤 **Quân** | Transactions (Đặt phòng BATCH Q5, Lịch sử Q2/Q3, Hóa đơn Q4) | **13 SP** | ~37.5% |
+| 👤 **Như** | Infrastructure (AstraDB, db.py, Base Tailwind, Giao diện Phòng QLKS-07, Dashboard) | **13 SP** | ~37.5% |
+| 👥 **Chung (Cả 3)** | Kiểm thử tổng thể, Chụp ảnh báo cáo & Đóng gói | **2 SP** | ~5% |
 | **TỔNG CỘNG** | **Toàn bộ Sprint (Hoàn thành trong 4 ngày)** | **37 SP** | **100%** |
 
 ---
