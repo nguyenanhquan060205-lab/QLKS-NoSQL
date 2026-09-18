@@ -83,6 +83,8 @@ def _build_room(row):
         capacity=getattr(row, "capacity", None),
         bed_type=getattr(row, "bed_type", None),
         description=getattr(row, "description", None),
+        current_guest_name=getattr(row, "current_guest_name", None),
+        current_booking_id=getattr(row, "current_booking_id", None),
     )
     if room.status not in VALID_STATUSES:
         room.status = "AVAILABLE" if room.is_available else "OCCUPIED"
@@ -97,7 +99,7 @@ def get_rooms_by_hotel(hotel_id):
     try:
         stmt = session.prepare("""
             SELECT hotel_id, room_number, room_type, price_per_night, is_available,
-                   status, capacity, bed_type, description
+                   status, capacity, bed_type, description, current_guest_name, current_booking_id
             FROM rooms_by_hotel
             WHERE hotel_id = ?;
         """)
@@ -116,7 +118,7 @@ def get_room(hotel_id, room_number):
     try:
         stmt = session.prepare("""
             SELECT hotel_id, room_number, room_type, price_per_night, is_available,
-                   status, capacity, bed_type, description
+                   status, capacity, bed_type, description, current_guest_name, current_booking_id
             FROM rooms_by_hotel
             WHERE hotel_id = ? AND room_number = ?;
         """)
@@ -127,6 +129,26 @@ def get_room(hotel_id, room_number):
     except Exception as error:
         print(f"❌ [Phòng] Lỗi lấy chi tiết phòng: {error}")
         return None
+
+
+def is_room_bookable(hotel_id, room_number):
+    """
+    Kiểm tra phòng có đang ở trạng thái sẵn sàng nhận đặt (AVAILABLE) hay không.
+
+    Dùng cho module Đặt phòng (booking_service.py/booking_routes.py, phụ trách bởi
+    Quân) gọi TRƯỚC KHI tạo booking mới — chặn đặt phòng đang bảo trì hoặc đang có
+    khách khác thuê (double-booking), mà không cần biết các giá trị status nội bộ.
+
+    Trả về:
+      - True  : phòng đang trống, đặt được.
+      - False : phòng tồn tại nhưng đang OCCUPIED/MAINTENANCE, không đặt được.
+      - None  : không tìm thấy phòng (hotel_id/room_number sai) — nên coi là lỗi
+                "phòng không tồn tại" chứ không phải "phòng đang bận".
+    """
+    room = get_room(hotel_id, room_number)
+    if room is None:
+        return None
+    return room.status == "AVAILABLE"
 
 
 def create_room(hotel_id, room_number, room_type, price_per_night, capacity, bed_type, description=""):
@@ -188,9 +210,16 @@ def update_room(hotel_id, room_number, room_type, price_per_night, capacity, bed
         return False, "Lỗi kết nối AstraDB, vui lòng thử lại."
 
 
-def change_room_status(hotel_id, room_number, new_status):
+def change_room_status(hotel_id, room_number, new_status, guest_name=None, booking_id=None):
     """
     Chuyển trạng thái phòng theo đúng ma trận ALLOWED_TRANSITIONS.
+
+    guest_name/booking_id: CHỈ có ý nghĩa khi new_status='OCCUPIED' — dùng để lưu lại
+    "ai đang thuê phòng này" cho trang chi tiết hiển thị (module Đặt phòng của Quân
+    truyền vào khi gọi tự động sau khi tạo booking thành công). Với mọi trạng thái
+    khác (AVAILABLE, MAINTENANCE), 2 trường này luôn được xóa về NULL — đặc biệt là
+    khi "trả phòng" (OCCUPIED -> AVAILABLE), thông tin khách cũ phải mất đi ngay.
+
     Trả về (True, None) nếu thành công, (False, lý_do) nếu bị chặn.
     """
     if new_status not in VALID_STATUSES:
@@ -209,16 +238,21 @@ def change_room_status(hotel_id, room_number, new_status):
             f'sang "{ROOM_STATUS_LABELS[new_status]}" trực tiếp.'
         )
 
+    if new_status != "OCCUPIED":
+        guest_name = None
+        booking_id = None
+
     session = get_session()
     if not session:
         return False, "Không thể kết nối AstraDB."
     try:
         is_available = new_status == "AVAILABLE"
         stmt = session.prepare("""
-            UPDATE rooms_by_hotel SET status = ?, is_available = ?
+            UPDATE rooms_by_hotel
+            SET status = ?, is_available = ?, current_guest_name = ?, current_booking_id = ?
             WHERE hotel_id = ? AND room_number = ?;
         """)
-        session.execute(stmt, (new_status, is_available, hotel_id, room_number))
+        session.execute(stmt, (new_status, is_available, guest_name, booking_id, hotel_id, room_number))
         return True, None
     except Exception as error:
         print(f"❌ [Phòng] Lỗi đổi trạng thái phòng: {error}")

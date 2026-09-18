@@ -54,6 +54,20 @@
         </div>
         {% endif %}
 
+        {% if room.status == 'OCCUPIED' %}
+        <div class="px-6 sm:px-8 pb-6 sm:pb-8">
+            <p class="text-xs font-medium text-slate-400 uppercase mb-1">Khách đang thuê</p>
+            {% if room.current_guest_name %}
+                <p class="font-semibold text-slate-900">{{ room.current_guest_name }}</p>
+                {% if room.current_booking_id %}
+                    <p class="text-xs text-slate-400 mt-0.5">Mã đặt phòng: {{ room.current_booking_id }}</p>
+                {% endif %}
+            {% else %}
+                <p class="text-sm text-slate-500 italic">Chưa rõ — trạng thái này chưa được module Đặt phòng cập nhật kèm thông tin khách.</p>
+            {% endif %}
+        </div>
+        {% endif %}
+
         <div class="p-6 sm:p-8 bg-slate-50 border-t border-slate-100 space-y-4">
             {% if room.status == 'OCCUPIED' %}
                 <div class="flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
