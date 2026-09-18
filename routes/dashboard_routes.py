@@ -3,7 +3,7 @@
 # PHỤ TRÁCH: NHƯ
 # ====================================================================
 
-from flask import Blueprint, render_template
+from flask import Blueprint, render_template, request
 from services import dashboard_service
 
 dashboard_bp = Blueprint('dashboard', __name__)
@@ -20,9 +20,22 @@ def index():
 @dashboard_bp.route('/dashboard', methods=['GET'])
 def dashboard():
     """
-    TODO (Như):
-    1. Gọi dashboard_service.get_dashboard_stats()
-    2. Truyền các thông số thống kê sang dashboard.html để hiển thị biểu đồ/card
+    Đọc bộ lọc (khách sạn, kỳ báo cáo, khoảng ngày tùy chọn) từ query string
+    và truyền xuống dashboard_service để tính báo cáo tương ứng.
     """
-    stats = dashboard_service.get_dashboard_stats()
-    return render_template('dashboard.html', stats=stats)
+    hotel_id = request.args.get('hotel_id') or None
+    period = request.args.get('period') or 'all'
+    start_date = request.args.get('start_date') or None
+    end_date = request.args.get('end_date') or None
+
+    stats = dashboard_service.get_dashboard_report(
+        hotel_id=hotel_id,
+        period=period,
+        custom_start=start_date,
+        custom_end=end_date,
+    )
+    return render_template(
+        'dashboard.html',
+        stats=stats,
+        period_options=dashboard_service.PERIOD_OPTIONS,
+    )

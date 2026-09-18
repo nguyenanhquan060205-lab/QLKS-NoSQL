@@ -54,6 +54,11 @@
             </div>
         </div>
     </div>
+    {% if stats.custom_range_error %}
+        <p class="mt-3 text-xs font-medium text-rose-600 flex items-center gap-1.5">
+            <i class="bi bi-exclamation-triangle-fill"></i> {{ stats.custom_range_error }}
+        </p>
+    {% endif %}
     <div class="mt-3 flex justify-end">
         <button type="submit" class="inline-flex min-h-10 items-center gap-2 rounded-xl bg-indigo-700 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-800 transition">
             <i class="bi bi-funnel"></i> Áp dụng
@@ -128,30 +133,33 @@
         <div class="max-h-72">
             <canvas id="hotelRevenueChart"></canvas>
         </div>
-        <div class="overflow-x-auto">
-            <table class="w-full text-left text-sm">
-                <thead class="bg-slate-50 text-xs uppercase tracking-wider text-slate-500">
-                    <tr>
-                        <th class="px-4 py-2.5">Khách sạn</th>
-                        <th class="px-4 py-2.5 text-right">Phòng</th>
-                        <th class="px-4 py-2.5 text-right">Lượt đặt</th>
-                        <th class="px-4 py-2.5 text-right">Doanh thu</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-slate-100">
-                    {% for h in stats.hotel_breakdown %}
+        <div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-sm">
+                    <thead class="bg-slate-50 text-xs uppercase tracking-wider text-slate-500">
                         <tr>
-                            <td class="px-4 py-2.5 font-medium text-slate-800">
-                                {{ h.name }}
-                                <a href="{{ url_for('dashboard.dashboard', hotel_id=h.hotel_id, period=stats.period, start_date=stats.custom_start, end_date=stats.custom_end) }}" class="ml-1 text-xs text-indigo-600 hover:underline">xem riêng</a>
-                            </td>
-                            <td class="px-4 py-2.5 text-right text-slate-600">{{ h.available_rooms }}/{{ h.total_rooms }} trống</td>
-                            <td class="px-4 py-2.5 text-right text-slate-600">{{ h.total_bookings }}</td>
-                            <td class="px-4 py-2.5 text-right font-semibold text-slate-900">{{ "{:,.0f}".format(h.total_revenue) }} đ</td>
+                            <th class="px-4 py-2.5">Khách sạn</th>
+                            <th class="px-4 py-2.5 text-right">Phòng</th>
+                            <th class="px-4 py-2.5 text-right">Lượt đặt</th>
+                            <th class="px-4 py-2.5 text-right">Doanh thu</th>
                         </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody id="hotel-breakdown-body" class="divide-y divide-slate-100">
+                        {% for h in stats.hotel_breakdown %}
+                            <tr class="hotel-breakdown-row">
+                                <td class="px-4 py-2.5 font-medium text-slate-800">
+                                    {{ h.name }}
+                                    <a href="{{ url_for('dashboard.dashboard', hotel_id=h.hotel_id, period=stats.period, start_date=stats.custom_start, end_date=stats.custom_end) }}" class="ml-1 text-xs text-indigo-600 hover:underline">xem riêng</a>
+                                </td>
+                                <td class="px-4 py-2.5 text-right text-slate-600">{{ h.available_rooms }}/{{ h.total_rooms }} trống</td>
+                                <td class="px-4 py-2.5 text-right text-slate-600">{{ h.total_bookings }}</td>
+                                <td class="px-4 py-2.5 text-right font-semibold text-slate-900">{{ "{:,.0f}".format(h.total_revenue) }} đ</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <div id="hotel-breakdown-pagination" class="flex items-center justify-between gap-3 mt-3 text-sm text-slate-500"></div>
         </div>
     </div>
 </div>
@@ -221,6 +229,46 @@
         options: { plugins: { legend: { position: 'bottom' } } }
     });
     {% endif %}
+
+    // Phân trang cho bảng "So sánh giữa các khách sạn"
+    (function () {
+        const PAGE_SIZE = 5;
+        const rows = Array.from(document.querySelectorAll('#hotel-breakdown-body .hotel-breakdown-row'));
+        const pager = document.getElementById('hotel-breakdown-pagination');
+        if (!rows.length || !pager) return;
+
+        const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+        let currentPage = 1;
+
+        function renderPage() {
+            rows.forEach((row, i) => {
+                const page = Math.floor(i / PAGE_SIZE) + 1;
+                row.hidden = page !== currentPage;
+            });
+
+            if (totalPages <= 1) {
+                pager.innerHTML = '';
+                return;
+            }
+
+            pager.innerHTML = `
+                <span>Trang ${currentPage}/${totalPages} · ${rows.length} khách sạn</span>
+                <div class="flex items-center gap-2">
+                    <button type="button" id="hotel-breakdown-prev" class="min-h-9 px-3 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed">« Trước</button>
+                    <button type="button" id="hotel-breakdown-next" class="min-h-9 px-3 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed">Sau »</button>
+                </div>
+            `;
+
+            const prevBtn = document.getElementById('hotel-breakdown-prev');
+            const nextBtn = document.getElementById('hotel-breakdown-next');
+            prevBtn.disabled = currentPage === 1;
+            nextBtn.disabled = currentPage === totalPages;
+            prevBtn.addEventListener('click', () => { if (currentPage > 1) { currentPage--; renderPage(); } });
+            nextBtn.addEventListener('click', () => { if (currentPage < totalPages) { currentPage++; renderPage(); } });
+        }
+
+        renderPage();
+    })();
 
     {% if stats.hotel_breakdown %}
     new Chart(document.getElementById('hotelRevenueChart'), {
