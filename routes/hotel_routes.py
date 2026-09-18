@@ -336,6 +336,12 @@ def add_room(hotel_id):
 
     form_data = {'room_number': room_number, **data}
 
+    # Kiểm tra chặn trùng số phòng trong cùng 1 khách sạn
+    if not errors.get('room_number') and form_data['room_number']:
+        existing_rooms = hotel_service.get_rooms_by_hotel(hotel_id)
+        if any(str(getattr(r, 'room_number', '')).strip() == form_data['room_number'] for r in existing_rooms):
+            errors['room_number'] = f"Phòng số '{form_data['room_number']}' đã tồn tại trong khách sạn này!"
+
     if errors:
         flash('Vui lòng kiểm tra lại các trường bắt buộc.', 'error')
         return render_template(

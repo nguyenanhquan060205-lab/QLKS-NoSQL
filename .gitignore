@@ -17,3 +17,7 @@ env/
 
 # OS
 .DS_Store
+
+# Thư mục tạm do cassandra-driver sinh ra khi giải nén secure-connect bundle
+# (mỗi lần kết nối tạo một tmpXXXXXXXX/ chứa ca.crt), không phải file của dự án
+tmp*/

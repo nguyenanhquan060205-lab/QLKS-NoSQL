@@ -5,8 +5,9 @@
 {% block content %}
 <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
     <div>
-        <h1 class="text-2xl font-bold text-slate-900 flex items-center gap-2">
-            <span>📊</span> Dashboard Thống Kê
+        <p class="text-xs font-semibold uppercase tracking-wider text-indigo-700">QLKS-12 · Thống kê</p>
+        <h1 class="mt-1 text-2xl sm:text-3xl font-bold text-slate-950">
+            Dashboard Thống Kê
         </h1>
         <p class="text-sm text-slate-500 mt-1">
             {% if stats.selected_hotel_name %}
@@ -55,8 +56,8 @@
         </div>
     </div>
     <div class="mt-3 flex justify-end">
-        <button type="submit" class="inline-flex min-h-10 items-center gap-2 rounded-xl bg-indigo-700 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-800 transition">
-            <i class="bi bi-funnel"></i> Áp dụng
+        <button type="submit" class="inline-flex min-h-10 items-center justify-center rounded-xl bg-indigo-700 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-800 transition cursor-pointer">
+            Áp dụng
         </button>
     </div>
 </form>
@@ -69,8 +70,12 @@
     </div>
     <div class="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
         <p class="text-xs font-medium text-slate-500">Tổng số phòng</p>
-        <p class="text-2xl font-extrabold text-cyan-600 mt-1">{{ stats.total_rooms }}</p>
-        <p class="text-xs text-emerald-600 font-medium mt-0.5">{{ stats.available_rooms }} đang trống</p>
+        <p class="text-2xl font-extrabold text-cyan-600 mt-1 tabular-nums">{{ stats.total_rooms }}</p>
+        <p class="text-xs font-medium mt-0.5 text-slate-500">
+            <span class="text-emerald-600">{{ stats.available_rooms }} trống</span>
+            · <span class="text-amber-600">{{ stats.occupied_rooms }} đang thuê</span>
+            · <span class="text-slate-500">{{ stats.maintenance_rooms }} bảo trì</span>
+        </p>
     </div>
     <div class="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
         <p class="text-xs font-medium text-slate-500">Lượt đặt (kỳ này)</p>
@@ -81,9 +86,9 @@
         <p class="text-xl font-extrabold text-emerald-600 mt-1">{{ "{:,.0f}".format(stats.total_revenue) }}<span class="text-xs font-medium text-slate-400"> đ</span></p>
     </div>
     <div class="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
-        <p class="text-xs font-medium text-slate-500 flex items-center gap-1">
+        <p class="text-xs font-medium text-slate-500 underline decoration-dotted decoration-slate-300 underline-offset-2 cursor-help"
+           title="ADR = Doanh thu trong kỳ / số đêm phòng đã bán trong kỳ">
             ADR (giá TB/đêm)
-            <i class="bi bi-info-circle text-slate-400" title="Doanh thu / số đêm phòng đã bán"></i>
         </p>
         {% if stats.adr is not none %}
             <p class="text-xl font-extrabold text-violet-600 mt-1">{{ "{:,.0f}".format(stats.adr) }}<span class="text-xs font-medium text-slate-400"> đ</span></p>
@@ -211,14 +216,20 @@
     new Chart(document.getElementById('roomStatusChart'), {
         type: 'doughnut',
         data: {
-            labels: ['Phòng trống', 'Phòng đã đặt'],
+            labels: ['Đang trống', 'Đang thuê', 'Bảo trì'],
             datasets: [{
-                data: [{{ stats.available_rooms }}, {{ stats.total_rooms - stats.available_rooms }}],
-                backgroundColor: ['#10b981', '#f59e0b'],
-                borderWidth: 0
+                data: [{{ stats.available_rooms }}, {{ stats.occupied_rooms }}, {{ stats.maintenance_rooms }}],
+                backgroundColor: ['#10b981', '#f59e0b', '#94a3b8'],
+                borderWidth: 2,
+                borderColor: '#ffffff'
             }]
         },
-        options: { plugins: { legend: { position: 'bottom' } } }
+        options: {
+            cutout: '62%',
+            plugins: {
+                legend: { position: 'bottom', labels: { boxWidth: 10, usePointStyle: true, pointStyle: 'circle' } }
+            }
+        }
     });
     {% endif %}
 

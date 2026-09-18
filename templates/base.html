@@ -10,8 +10,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <!-- Bootstrap Icons CDN (cho icons) -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <!-- Đã bỏ Bootstrap Icons: toàn bộ giao diện dùng chữ + dot thuần, không icon font.
+         Nếu thêm icon lại thì nạp CDN ở đây, đừng nhúng lẻ trong từng template. -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <style>
         body { font-family: 'Inter', sans-serif; }
@@ -22,52 +22,54 @@
         Bỏ qua điều hướng
     </a>
 
-    <!-- NAVBAR HIỆN ĐẠI (Tailwind CSS v4 - Phụ trách: Như) -->
+    <!-- NAVBAR HIỆN ĐẠI (Tailwind CSS v4) -->
     <header class="bg-slate-900 border-b border-slate-800 sticky top-0 z-50">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="w-full px-4 sm:px-6 lg:px-8 xl:px-12">
             <div class="flex items-center justify-between h-16">
-                <!-- Logo -->
+                <!-- Logo & Brand -->
                 <div class="flex items-center space-x-3">
-                    <a href="/" class="flex items-center space-x-2 text-white font-bold text-lg tracking-wide hover:text-indigo-400 transition">
-                        <span class="text-2xl">🏨</span>
-                        <span>QLKS <span class="text-xs bg-indigo-600 text-white px-2 py-0.5 rounded-full font-semibold">NoSQL</span></span>
+                    <a href="/" class="flex items-center space-x-2.5 text-white font-bold tracking-wide hover:text-cyan-400 transition">
+                        <span class="text-lg font-black tracking-wider uppercase">MƯỜNG THANH</span>
+                        <span class="text-[11px] uppercase tracking-wider bg-cyan-950 text-cyan-300 border border-cyan-800 px-2 py-0.5 rounded-md font-semibold">Hospitality PMS</span>
                     </a>
                 </div>
 
-                <!-- Navigation Links -->
+                <!-- Navigation Links (No AI Slop Icons) -->
                 <nav class="hidden md:flex items-center space-x-1">
-                    <!-- Như -->
-                    <a href="/" class="px-3 py-2 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-800 transition">
-                        <i class="bi bi-house me-1"></i> Trang chủ
+                    <a href="/" class="px-3.5 py-2 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-800 transition">
+                        Trang chủ
                     </a>
-                    <a href="/dashboard" class="px-3 py-2 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-800 transition">
-                        <i class="bi bi-bar-chart-line me-1"></i> Dashboard
-                    </a>
-
-                    <!-- Divider -->
-                    <span class="text-slate-700">|</span>
-
-                    <!-- Khách sạn -->
-                    <a href="/hotels" class="px-3 py-2 rounded-lg text-sm font-medium text-cyan-300 hover:bg-cyan-950/50 hover:text-cyan-200 transition">
-                        <i class="bi bi-building me-1"></i> Khách sạn
-                    </a>
-                    <a href="/guests" class="px-3 py-2 rounded-lg text-sm font-medium text-cyan-300 hover:bg-cyan-950/50 hover:text-cyan-200 transition">
-                        <i class="bi bi-people me-1"></i> Khách hàng
+                    <a href="/dashboard" class="px-3.5 py-2 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-800 transition">
+                        Dashboard
                     </a>
 
                     <!-- Divider -->
-                    <span class="text-slate-700">|</span>
+                    <span class="text-slate-700 px-1">|</span>
 
-                    <!-- Đặt phòng & Hóa đơn -->
-                    <a href="/bookings" class="px-3 py-2 rounded-lg text-sm font-medium text-amber-300 hover:bg-amber-950/50 hover:text-amber-200 transition">
-                        <i class="bi bi-calendar-check me-1"></i> Đặt phòng & Hóa đơn
+                    <!-- Quản trị chi nhánh & khách hàng -->
+                    <a href="/hotels" class="px-3.5 py-2 rounded-lg text-sm font-medium text-cyan-300 hover:bg-cyan-950/60 hover:text-cyan-200 transition">
+                        Chi nhánh
+                    </a>
+                    <a href="/guests" class="px-3.5 py-2 rounded-lg text-sm font-medium text-cyan-300 hover:bg-cyan-950/60 hover:text-cyan-200 transition">
+                        Khách hàng
+                    </a>
+
+                    <!-- Divider -->
+                    <span class="text-slate-700 px-1">|</span>
+
+                    <!-- Nghiệp vụ Đặt phòng & Hóa đơn tách riêng biệt -->
+                    <a href="/bookings" class="px-3.5 py-2 rounded-lg text-sm font-medium transition {% if request.path.startswith('/bookings') %}bg-amber-950/80 text-amber-200 border border-amber-800/60{% else %}text-amber-300 hover:bg-amber-950/60 hover:text-amber-200{% endif %}">
+                        Đặt phòng
+                    </a>
+                    <a href="/invoices" class="px-3.5 py-2 rounded-lg text-sm font-medium transition {% if request.path.startswith('/invoices') %}bg-amber-950/80 text-amber-200 border border-amber-800/60{% else %}text-amber-300 hover:bg-amber-950/60 hover:text-amber-200{% endif %}">
+                        Hóa đơn
                     </a>
                 </nav>
 
                 <!-- Mobile Menu Button -->
                 <div class="md:hidden flex items-center">
-                    <button id="mobile-menu-btn" type="button" aria-label="Mở menu điều hướng" aria-expanded="false" class="min-h-11 min-w-11 text-slate-400 hover:text-white p-2 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 transition motion-reduce:transition-none">
-                        <i class="bi bi-list text-2xl"></i>
+                    <button id="mobile-menu-btn" type="button" aria-label="Mở menu điều hướng" aria-expanded="false" class="min-h-11 min-w-11 text-slate-400 hover:text-white px-3 py-1.5 rounded-lg border border-slate-700 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 transition motion-reduce:transition-none">
+                        Menu
                     </button>
                 </div>
             </div>
@@ -77,20 +79,21 @@
         <div id="mobile-menu" class="hidden md:hidden px-4 pt-2 pb-4 space-y-1 bg-slate-900 border-t border-slate-800">
             <a href="/" class="block px-3 py-2 rounded-md text-base font-medium text-slate-300 hover:bg-slate-800">Trang chủ</a>
             <a href="/dashboard" class="block px-3 py-2 rounded-md text-base font-medium text-slate-300 hover:bg-slate-800">Dashboard</a>
-            <a href="/hotels" class="block px-3 py-2 rounded-md text-base font-medium text-cyan-300 hover:bg-cyan-950">Khách sạn</a>
+            <a href="/hotels" class="block px-3 py-2 rounded-md text-base font-medium text-cyan-300 hover:bg-cyan-950">Chi nhánh</a>
             <a href="/guests" class="block px-3 py-2 rounded-md text-base font-medium text-cyan-300 hover:bg-cyan-950">Khách hàng</a>
-            <a href="/bookings" class="block px-3 py-2 rounded-md text-base font-medium text-amber-300 hover:bg-amber-950">Đặt phòng & Hóa đơn</a>
+            <a href="/bookings" class="block px-3 py-2 rounded-md text-base font-medium text-amber-300 hover:bg-amber-950">Đặt phòng</a>
+            <a href="/invoices" class="block px-3 py-2 rounded-md text-base font-medium text-amber-300 hover:bg-amber-950">Hóa đơn</a>
         </div>
     </header>
 
-    <!-- NỘI DUNG CHÍNH CỦA CÁC TRANG (Do từng thành viên code) -->
-    <main id="main-content" class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8" tabindex="-1">
+    <!-- NỘI DUNG CHÍNH CỦA CÁC TRANG -->
+    <main id="main-content" class="flex-1 w-full px-4 sm:px-6 lg:px-8 xl:px-12 py-6 sm:py-8" tabindex="-1">
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 <div class="space-y-3 mb-6" aria-live="polite">
                     {% for category, message in messages %}
-                        <div role="alert" class="flex items-start gap-3 rounded-xl border px-4 py-3 text-sm shadow-sm {% if category == 'success' %}border-emerald-200 bg-emerald-50 text-emerald-800{% else %}border-red-200 bg-red-50 text-red-800{% endif %}">
-                            <i class="bi {% if category == 'success' %}bi-check-circle-fill{% else %}bi-exclamation-circle-fill{% endif %} mt-0.5" aria-hidden="true"></i>
+                        <div role="alert" class="flex items-center gap-3 rounded-xl border px-4 py-3 text-sm shadow-sm {% if category == 'success' %}border-emerald-200 bg-emerald-50 text-emerald-900 font-medium{% else %}border-red-200 bg-red-50 text-red-900 font-medium{% endif %}">
+                            <span class="inline-block h-2 w-2 rounded-full {% if category == 'success' %}bg-emerald-500{% else %}bg-red-500{% endif %}"></span>
                             <span>{{ message }}</span>
                         </div>
                     {% endfor %}
@@ -104,12 +107,12 @@
 
     <!-- FOOTER CHUNG -->
     <footer class="bg-white border-t border-slate-200 py-6 mt-auto">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between text-sm text-slate-500">
+        <div class="w-full px-4 sm:px-6 lg:px-8 xl:px-12 flex flex-col sm:flex-row items-center justify-between text-sm text-slate-500">
             <div>
-                🏨 <strong>Đồ án NoSQL</strong>: Quản Lý Khách Sạn (Cassandra / AstraDB)
+                <strong>Mường Thanh Hospitality</strong> — Hệ Thống Quản Lý Chuỗi Khách Sạn Nội Bộ (DataStax AstraDB)
             </div>
-            <div class="mt-2 sm:mt-0">
-                Giao diện xây dựng với <span class="text-indigo-600 font-semibold">Tailwind CSS v4</span>
+            <div class="mt-2 sm:mt-0 text-slate-400 text-xs">
+                Cơ sở dữ liệu phân tán Cassandra · Kiến trúc Query-First
             </div>
         </div>
     </footer>

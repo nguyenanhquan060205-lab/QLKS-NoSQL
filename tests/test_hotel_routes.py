@@ -203,8 +203,9 @@ class HotelRoutesTest(unittest.TestCase):
         self.assertIn("Số điện thoại phải gồm đúng 10 chữ số", response.get_data(as_text=True))
         create_guest.assert_not_called()
 
+    @patch("routes.hotel_routes.hotel_service.get_all_guests", return_value=[])
     @patch("routes.hotel_routes.hotel_service.update_guest", return_value=True)
-    def test_edit_guest_calls_service_and_redirects(self, update_guest):
+    def test_edit_guest_calls_service_and_redirects(self, update_guest, _):
         response = self.client.post(
             "/guests/G001/edit",
             data={
@@ -365,6 +366,57 @@ class HotelRoutesTest(unittest.TestCase):
         self.assertIn("đã được đăng ký cho khách hàng khác", res3.get_data(as_text=True))
         create_guest.assert_not_called()
 
+    @patch("routes.hotel_routes.room_service.get_room")
+    def test_room_detail_shows_active_guest_when_occupied(self, mock_get_room):
+        """
+        Trang chi tiết phòng lấy "ai đang thuê" từ 2 cột denormalize trên rooms_by_hotel
+        (current_guest_name / current_booking_id), do booking_routes ghi vào lúc đặt phòng
+        thành công — không truy vấn bookings_by_guest ở đây nữa.
+
+        Hồ sơ khách đầy đủ (điện thoại, CMND, số đêm, tiền) nằm ở modal chi tiết phòng của
+        trang Đặt phòng, qua booking_service.get_active_booking_for_room.
+        """
+        mock_get_room.return_value = SimpleNamespace(
+            hotel_id="MT_004",
+            room_number="102",
+            room_type="Deluxe King",
+            price_per_night=850000,
+            is_available=False,
+            status="OCCUPIED",
+            capacity=2,
+            bed_type="King",
+            description="Phòng tiêu chuẩn view biển",
+            current_guest_name="Đinh Quang Khải",
+            current_booking_id="BK2026091045",
+        )
+        response = self.client.get("/hotels/MT_004/rooms/102")
+        self.assertEqual(response.status_code, 200)
+        html = response.get_data(as_text=True)
+        self.assertIn("Khách đang thuê", html)
+        self.assertIn("Đinh Quang Khải", html)
+        self.assertIn("BK2026091045", html)
+
+    @patch("routes.hotel_routes.room_service.get_room")
+    def test_room_detail_occupied_without_guest_info_shows_fallback(self, mock_get_room):
+        """Phòng OCCUPIED nhưng 2 cột khách còn NULL (đổi trạng thái tay) -> không để trống trơn."""
+        mock_get_room.return_value = SimpleNamespace(
+            hotel_id="MT_004",
+            room_number="103",
+            room_type="Standard",
+            price_per_night=550000,
+            is_available=False,
+            status="OCCUPIED",
+            capacity=2,
+            bed_type="Twin",
+            description="",
+            current_guest_name=None,
+            current_booking_id=None,
+        )
+        response = self.client.get("/hotels/MT_004/rooms/103")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Chưa rõ", response.get_data(as_text=True))
+
 
 if __name__ == "__main__":
     unittest.main()
+

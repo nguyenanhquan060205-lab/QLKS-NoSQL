@@ -32,8 +32,24 @@ CREATE TABLE IF NOT EXISTS rooms_by_hotel (
     room_type text,
     price_per_night decimal,
     is_available boolean,
+    status text,          -- 'AVAILABLE', 'OCCUPIED', 'MAINTENANCE'
+    capacity int,         -- Số khách tối đa (1-10)
+    bed_type text,        -- 'Single', 'Double', 'Twin', 'King', 'Queen'
+    description text,
+    current_guest_name text,   -- Tên khách ĐANG lưu trú (denormalize để trang chi tiết phòng
+                               -- đọc 1 lần theo khóa chính, không phải quét bookings_by_guest).
+                               -- Chỉ có giá trị khi status = 'OCCUPIED', NULL ở mọi trạng thái khác.
+    current_booking_id text,   -- Mã booking đang gắn với phòng, cùng vòng đời với current_guest_name
     PRIMARY KEY (hotel_id, room_number)
 );
+
+-- LỆNH MIGRATION: Nếu bảng rooms_by_hotel đã tạo từ trước thiếu các cột mới, chạy trên AstraDB CQL Console:
+-- ALTER TABLE rooms_by_hotel ADD status text;
+-- ALTER TABLE rooms_by_hotel ADD capacity int;
+-- ALTER TABLE rooms_by_hotel ADD bed_type text;
+-- ALTER TABLE rooms_by_hotel ADD description text;
+-- ALTER TABLE rooms_by_hotel ADD current_guest_name text;
+-- ALTER TABLE rooms_by_hotel ADD current_booking_id text;
 
 -- Bảng 3: Hồ sơ khách hàng (Bao gồm địa chỉ cư trú)
 CREATE TABLE IF NOT EXISTS guests (
@@ -89,58 +105,41 @@ CREATE TABLE IF NOT EXISTS invoices_by_booking (
     payment_method text,
     payment_status text,
     total_amount decimal,
+    deposit_amount decimal,
+    remaining_amount decimal,
     PRIMARY KEY (booking_id, invoice_id)
 );
 
 
 -- ====================================================================
--- DỮ LIỆU MẪU CHUỖI KHÁCH SẠN MƯỜNG THANH & GIÁ PHÒNG THỰC TẾ
+-- DỮ LIỆU MẪU CHUỖI KHÁCH SẠN MƯỜNG THANH HOSPITALITY (MT_001 - MT_005)
 -- ====================================================================
 
--- 1. Khách sạn Mường Thanh tại các tỉnh thành lớn (theo danh mục 34 tỉnh)
+-- 1. Các chi nhánh tiêu biểu phủ các tỉnh thành
 INSERT INTO hotels (hotel_id, name, phone, address, city, country, amenities)
-VALUES ('H001', 'Mường Thanh Luxury Đà Nẵng', '02363956789', '270 Võ Nguyên Giáp, Phường Mỹ An', 'Thành phố Đà Nẵng', 'Vietnam', {'Bể bơi vô cực', 'Spa', 'Bãi biển riêng', 'Gym', 'Wifi'});
-
-INSERT INTO hotels (hotel_id, name, phone, address, city, country, amenities)
-VALUES ('H002', 'Mường Thanh Luxury Nha Trang', '02583898888', '60 Trần Phú, Phường Lộc Thọ', 'Khánh Hòa', 'Vietnam', {'Bể bơi ngoài trời', 'Trung tâm hội nghị', 'Spa', 'View biển', 'Wifi'});
+VALUES ('MT_001', 'Mường Thanh Luxury Hà Nội Centre', '02439428686', 'Số 78 Thợ Nhuộm, Phường Trần Hưng Đạo, Hoàn Kiếm', 'Thành phố Hà Nội', 'Vietnam', {'Hồ bơi trong nhà', 'Trầm Spa & Massage', 'Nhà hàng Bát Tràng', 'Phòng tập thể thao', 'Phòng hội nghị'});
 
 INSERT INTO hotels (hotel_id, name, phone, address, city, country, amenities)
-VALUES ('H003', 'Mường Thanh Grand Hà Nội', '02436408686', 'Lô CC2 Bắc Linh Đàm, Phường Đại Kim', 'Thành phố Hà Nội', 'Vietnam', {'Hồ bơi trong nhà', 'Sân tennis', 'Nhà hàng', 'Gym', 'Wifi'});
+VALUES ('MT_002', 'Mường Thanh Grand Hà Nội', '02436408686', 'Lô CC2, Khu đô thị Bắc Linh Đàm, Đại Kim, Hoàng Mai', 'Thành phố Hà Nội', 'Vietnam', {'Hồ bơi bốn mùa', 'Phòng gym', 'Nhà hàng Cầu Gỗ', 'Bar sân thượng', 'Wifi tốc độ cao'});
 
 INSERT INTO hotels (hotel_id, name, phone, address, city, country, amenities)
-VALUES ('H004', 'Mường Thanh Luxury Sài Gòn', '02838445678', '261 Nguyễn Văn Trỗi, Phường 10', 'Thành phố Hồ Chí Minh', 'Vietnam', {'Rooftop Bar', 'Hồ bơi sân thượng', 'Gym', 'Đưa đón sân bay', 'Wifi'});
+VALUES ('MT_003', 'Mường Thanh Grand Điện Biên Phủ', '02153810056', 'Số 514 Đường Võ Nguyên Giáp, Phường Him Lam', 'Điện Biên', 'Vietnam', {'Hồ bơi ngoài trời', 'Nhà hàng Mường Phăng ẩm thực Tây Bắc', 'Hoa Ban Spa', 'Sân tennis'});
 
--- 2. Phòng mẫu theo các hạng phòng và giá thực tế Mường Thanh
--- Đà Nẵng
-INSERT INTO rooms_by_hotel (hotel_id, room_number, room_type, price_per_night, is_available)
-VALUES ('H001', '101', 'Deluxe Twin', 1350000, true);
+INSERT INTO hotels (hotel_id, name, phone, address, city, country, amenities)
+VALUES ('MT_004', 'Mường Thanh Luxury Sông Hàn', '02363656166', 'Số 115 Nguyễn Văn Linh, Phường Nam Dương, Hải Châu', 'Thành phố Đà Nẵng', 'Vietnam', {'Hồ bơi ngoài trời view cầu Rồng', 'D’Lusso Spa & Massage', 'Nhà hàng Camellia', 'Sky Bar'});
 
-INSERT INTO rooms_by_hotel (hotel_id, room_number, room_type, price_per_night, is_available)
-VALUES ('H001', '102', 'Deluxe King', 1450000, true);
+INSERT INTO hotels (hotel_id, name, phone, address, city, country, amenities)
+VALUES ('MT_005', 'Mường Thanh Luxury Sài Gòn', '02838445678', 'Số 261 Nguyễn Văn Trỗi, Phường 10, Phú Nhuận', 'Thành phố Hồ Chí Minh', 'Vietnam', {'Hồ bơi vô cực tầng thượng', 'Nhà hàng Phú Nhuận', 'Chăm sóc sức khỏe hoa Sen', 'Phòng tập gym'});
 
-INSERT INTO rooms_by_hotel (hotel_id, room_number, room_type, price_per_night, is_available)
-VALUES ('H001', '201', 'Executive Suite', 2600000, true);
+-- 2. Phòng mẫu theo tiêu chuẩn chuỗi Mường Thanh
+INSERT INTO rooms_by_hotel (hotel_id, room_number, room_type, price_per_night, is_available, status, capacity, bed_type, description)
+VALUES ('MT_001', '101', 'Deluxe King', 1850000, true, 'AVAILABLE', 2, '1 Giường King', 'Phòng cao cấp hướng phố, trang bị bồn tắm nằm sang trọng');
 
-INSERT INTO rooms_by_hotel (hotel_id, room_number, room_type, price_per_night, is_available)
-VALUES ('H001', '301', 'Grand Suite', 3800000, true);
+INSERT INTO rooms_by_hotel (hotel_id, room_number, room_type, price_per_night, is_available, status, capacity, bed_type, description)
+VALUES ('MT_001', '102', 'Deluxe Twin', 1850000, true, 'AVAILABLE', 2, '2 Giường Twin', 'Phòng hai giường đơn tiện nghi cao cấp');
 
--- Nha Trang
-INSERT INTO rooms_by_hotel (hotel_id, room_number, room_type, price_per_night, is_available)
-VALUES ('H002', '401', 'Deluxe Ocean', 1650000, true);
-
-INSERT INTO rooms_by_hotel (hotel_id, room_number, room_type, price_per_night, is_available)
-VALUES ('H002', '501', 'Executive Suite', 2800000, true);
-
--- Hà Nội
-INSERT INTO rooms_by_hotel (hotel_id, room_number, room_type, price_per_night, is_available)
-VALUES ('H003', '105', 'Superior King', 950000, true);
-
-INSERT INTO rooms_by_hotel (hotel_id, room_number, room_type, price_per_night, is_available)
-VALUES ('H003', '205', 'Deluxe King', 1250000, true);
-
--- Sài Gòn
-INSERT INTO rooms_by_hotel (hotel_id, room_number, room_type, price_per_night, is_available)
-VALUES ('H004', '601', 'Deluxe King', 1600000, true);
+INSERT INTO rooms_by_hotel (hotel_id, room_number, room_type, price_per_night, is_available, status, capacity, bed_type, description)
+VALUES ('MT_001', '201', 'Executive Suite', 3600000, false, 'OCCUPIED', 3, '1 Giường King lớn', 'Phòng Suite thượng hạng phòng khách riêng biệt view toàn cảnh');
 
 -- 3. Khách hàng mẫu kèm địa chỉ cư trú
 INSERT INTO guests (guest_id, full_name, email, phone, id_card, address)
