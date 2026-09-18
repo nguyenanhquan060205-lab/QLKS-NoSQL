@@ -32,9 +32,26 @@ class RoomServiceAstraIntegrationTest(unittest.TestCase):
         if cls.session is None:
             raise RuntimeError("Không thể kết nối Cassandra/Astra DB")
 
+    # Test này chạy trên AstraDB THẬT — cùng database mà dashboard đang thống kê.
+    # Không dọn thì mấy phòng test nằm lại vĩnh viễn và bị đếm vào "tổng số phòng"
+    # với "phòng đang thuê" trên báo cáo, làm số liệu lệch mà không ai lần ra.
+    TEST_HOTELS = ("H_QLKS05_TEST_A", "H_QLKS05_TEST_B")
+
+    @classmethod
+    def tearDownClass(cls):
+        session = getattr(cls, "session", None)
+        if session is None:
+            return
+        for hotel_id in cls.TEST_HOTELS:
+            try:
+                session.execute(
+                    "DELETE FROM rooms_by_hotel WHERE hotel_id = %s;", (hotel_id,)
+                )
+            except Exception as error:
+                print(f"⚠️ Không dọn được phòng test của {hotel_id}: {error}")
+
     def test_create_and_get_rooms_from_only_requested_hotel_partition(self):
-        hotel_a = "H_QLKS05_TEST_A"
-        hotel_b = "H_QLKS05_TEST_B"
+        hotel_a, hotel_b = self.TEST_HOTELS
 
         self.assertTrue(
             hotel_service.create_room(

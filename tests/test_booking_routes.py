@@ -14,6 +14,25 @@ class BookingRoutesTest(unittest.TestCase):
         app.register_blueprint(booking_bp)
         self.client = app.test_client()
 
+        # CHỐT AN TOÀN: route đặt phòng gọi room_service.change_room_status() để tự
+        # chuyển phòng sang OCCUPIED. Hàm đó tự mở kết nối AstraDB, nên nếu không
+        # chặn ở đây thì unit test GHI THẲNG VÀO DATABASE THẬT của nhóm.
+        #
+        # Đã xảy ra rồi: test_create_booking_success_redirects_to_invoice tạo ra
+        # phòng rác H001/101 (OCCUPIED, "Nguyễn Văn An", BK_NEW_123) nằm lại trong
+        # AstraDB và bị đếm vào "tổng số phòng" / "phòng đang thuê" trên dashboard.
+        # Chạy 1 test đó cũng mất 16 giây vì phải bắt tay với Astra.
+        #
+        # Test nào cần assert lời gọi này thì tự khai @patch riêng, decorator sẽ
+        # đè lên bản chặn ở đây.
+        for target, result in (
+            ("routes.booking_routes.room_service.change_room_status", (True, None)),
+            ("routes.booking_routes.room_service.invalidate_rooms_cache", None),
+        ):
+            patcher = patch(target, return_value=result)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+
     @patch("routes.booking_routes.hotel_service.get_all_hotels", return_value=[
         SimpleNamespace(hotel_id="H001", name="Vinpearl Nha Trang")
     ])

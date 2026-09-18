@@ -2,7 +2,9 @@ from decimal import Decimal
 import unittest
 from unittest.mock import patch
 
-from services import hotel_service
+from types import SimpleNamespace
+
+from services import hotel_service, room_service
 
 
 class FakeRoomSession:
@@ -94,3 +96,108 @@ class RoomServiceTest(unittest.TestCase):
 if __name__ == "__main__":
     unittest.main()
 
+
+
+class ChangeRoomStatusTest(unittest.TestCase):
+    """
+    Test HÀM THẬT room_service.change_room_status, không mock nó đi.
+
+    Trước đây cả bộ test đều mock change_room_status ở tầng route, nên không ai
+    phát hiện là trong hàm có biến `is_available` được dùng mà không bao giờ được
+    gán. Mọi lần đổi trạng thái đều nổ UnboundLocalError, bị except bắt lại rồi
+    báo ra "Lỗi kết nối AstraDB, vui lòng thử lại." — sai hoàn toàn bản chất.
+    """
+
+    def setUp(self):
+        self.executed = []
+
+        class RecordingSession:
+            def __init__(inner):
+                inner.queries = {}
+
+            def prepare(inner, query):
+                stmt = object()
+                inner.queries[id(stmt)] = query
+                return stmt
+
+            def execute(inner, stmt, parameters=None):
+                self.executed.append((inner.queries.get(id(stmt), ""), parameters))
+                return []
+
+        self.session = RecordingSession()
+
+    def _patched(self, room):
+        return (
+            patch.object(room_service, "get_session", return_value=self.session),
+            patch.object(room_service, "get_room", return_value=room),
+        )
+
+    def test_check_out_sets_available_and_clears_guest_columns(self):
+        room = SimpleNamespace(hotel_id="MT_004", room_number="102", status="OCCUPIED")
+        p1, p2 = self._patched(room)
+        with p1, p2:
+            ok, err = room_service.change_room_status("MT_004", "102", "AVAILABLE")
+
+        self.assertTrue(ok, msg=f"trả phòng phải thành công, nhận lỗi: {err}")
+        self.assertIsNone(err)
+        self.assertEqual(len(self.executed), 1)
+
+        query, params = self.executed[0]
+        self.assertIn("UPDATE rooms_by_hotel", query)
+        # AVAILABLE -> is_available phải True, và 2 cột khách phải bị xóa về None
+        self.assertEqual(params, ("AVAILABLE", True, None, None, "MT_004", "102"))
+
+    def test_occupied_keeps_guest_info_and_sets_unavailable(self):
+        room = SimpleNamespace(hotel_id="MT_004", room_number="102", status="AVAILABLE")
+        p1, p2 = self._patched(room)
+        with p1, p2:
+            ok, err = room_service.change_room_status(
+                "MT_004", "102", "OCCUPIED",
+                guest_name="Lê Hoàng Nam", booking_id="BK_X1",
+            )
+
+        self.assertTrue(ok, msg=f"nhận lỗi: {err}")
+        _, params = self.executed[0]
+        self.assertEqual(params, ("OCCUPIED", False, "Lê Hoàng Nam", "BK_X1", "MT_004", "102"))
+
+    def test_maintenance_sets_unavailable_and_clears_guest(self):
+        room = SimpleNamespace(hotel_id="MT_004", room_number="102", status="AVAILABLE")
+        p1, p2 = self._patched(room)
+        with p1, p2:
+            ok, err = room_service.change_room_status(
+                "MT_004", "102", "MAINTENANCE",
+                guest_name="Không nên giữ", booking_id="BK_X2",
+            )
+
+        self.assertTrue(ok, msg=f"nhận lỗi: {err}")
+        _, params = self.executed[0]
+        self.assertEqual(params, ("MAINTENANCE", False, None, None, "MT_004", "102"))
+
+    def test_blocked_transition_returns_reason_not_connection_error(self):
+        """OCCUPIED -> MAINTENANCE bị ma trận chặn, và không được chạm tới DB."""
+        room = SimpleNamespace(hotel_id="MT_004", room_number="102", status="OCCUPIED")
+        p1, p2 = self._patched(room)
+        with p1, p2:
+            ok, err = room_service.change_room_status("MT_004", "102", "MAINTENANCE")
+
+        self.assertFalse(ok)
+        self.assertIn("Không thể chuyển", err)
+        self.assertEqual(self.executed, [])
+
+    def test_query_failure_message_is_not_mislabeled_as_connection_error(self):
+        """Query lỗi thì phải nói ra lỗi thật, đừng gán nhãn 'lỗi kết nối'."""
+        class BrokenSession:
+            def prepare(self, query):
+                raise RuntimeError("Undefined column name current_guest_name")
+
+            def execute(self, *a, **kw):
+                raise RuntimeError("không nên tới đây")
+
+        room = SimpleNamespace(hotel_id="MT_004", room_number="102", status="OCCUPIED")
+        with patch.object(room_service, "get_session", return_value=BrokenSession()), \
+             patch.object(room_service, "get_room", return_value=room):
+            ok, err = room_service.change_room_status("MT_004", "102", "AVAILABLE")
+
+        self.assertFalse(ok)
+        self.assertNotIn("Lỗi kết nối AstraDB", err)
+        self.assertIn("Undefined column name", err)
