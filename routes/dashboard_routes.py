@@ -3,7 +3,7 @@
 # PHỤ TRÁCH: NHƯ
 # ====================================================================
 
-from flask import Blueprint, flash, render_template, request
+from flask import Blueprint, render_template, request
 from services import dashboard_service
 
 dashboard_bp = Blueprint('dashboard', __name__)
@@ -37,11 +37,10 @@ def dashboard():
         custom_end=request.args.get('end_date'),
     )
 
-    # Khoảng ngày tùy chọn không hợp lệ: service đã tự lùi về "toàn bộ thời gian" và
-    # trả kèm lý do — báo cho người dùng biết, thay vì im lặng đổi kết quả.
-    if stats.get('custom_range_error'):
-        flash(stats['custom_range_error'], 'error')
-
+    # Khoảng ngày tùy chọn không hợp lệ thì service tự lùi về "toàn bộ thời gian" và
+    # trả kèm lý do trong stats.custom_range_error. KHÔNG flash() nữa: dashboard.html
+    # đã hiện lỗi đó ngay dưới khung filter — đúng chỗ người dùng đang nhìn — nên
+    # flash thêm sẽ ra thông báo trùng 2 lần.
     return render_template(
         'dashboard.html',
         stats=stats,
