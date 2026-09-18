@@ -4,7 +4,7 @@
 
 {% block content %}
 <section aria-labelledby="rooms-heading">
-    <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between mb-6">
+    <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-6">
         <div>
             <a href="{{ url_for('hotel.list_hotels') }}" class="inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-cyan-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 rounded">
                 <i class="bi bi-arrow-left" aria-hidden="true"></i> Quay lại danh sách khách sạn
@@ -12,110 +12,130 @@
             <p class="mt-3 text-sm font-semibold uppercase tracking-wider text-cyan-700">QLKS-07 · Query Q1</p>
             <h1 id="rooms-heading" class="mt-1 flex items-center gap-3 text-2xl sm:text-3xl font-bold text-slate-950">
                 <span class="flex h-11 w-11 items-center justify-center rounded-xl bg-cyan-100 text-cyan-700" aria-hidden="true"><i class="bi bi-door-open"></i></span>
-                Quản lý phòng
+                Danh sách phòng
             </h1>
             <p class="mt-2 text-sm sm:text-base text-slate-600">
-                Khách sạn <code class="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-slate-700">{{ hotel_id }}</code> ·
-                bảng Cassandra <code class="text-cyan-700">rooms_by_hotel</code> (Partition Key: hotel_id)
+                Khách sạn <strong class="text-slate-800">{{ hotel.name if hotel else hotel_id }}</strong>
+                (<code class="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-slate-700">{{ hotel_id }}</code>)
             </p>
         </div>
-        <div class="inline-flex w-fit items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm">
-            <span class="h-2.5 w-2.5 rounded-full bg-emerald-500" aria-hidden="true"></span>
-            {{ rooms|length }} phòng
-        </div>
+        <a href="{{ url_for('hotel.new_room_form', hotel_id=hotel_id) }}" class="inline-flex min-h-11 items-center gap-2 rounded-xl bg-cyan-700 px-4 py-2.5 font-semibold text-white shadow-sm transition hover:bg-cyan-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-600 focus-visible:ring-offset-2">
+            <i class="bi bi-plus-lg" aria-hidden="true"></i> Thêm phòng mới
+        </a>
     </div>
 
-    <div class="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,360px)_minmax(0,1fr)] lg:items-start">
-        <aside id="room-form" class="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-sm lg:sticky lg:top-24">
-            <div class="mb-5">
-                <h2 class="text-lg font-semibold text-slate-950">Thêm phòng mới</h2>
-                <p class="mt-1 text-sm text-slate-500">Phòng sẽ được thêm vào đúng khách sạn {{ hotel_id }}.</p>
+    <!-- BỘ LỌC: loại phòng / sức chứa tối thiểu / trạng thái -->
+    <form method="get" action="{{ url_for('hotel.list_rooms', hotel_id=hotel_id) }}" class="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 shadow-sm mb-6">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end">
+            <div>
+                <label for="filter-room-type" class="block text-xs font-semibold text-slate-500 mb-1">Loại phòng</label>
+                <select id="filter-room-type" name="room_type" class="min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus-visible:border-cyan-600 focus-visible:ring-2 focus-visible:ring-cyan-200">
+                    <option value="">Tất cả loại phòng</option>
+                    {% for rt in room_type_options %}
+                        <option value="{{ rt }}" {% if filter_room_type == rt %}selected{% endif %}>{{ rt }}</option>
+                    {% endfor %}
+                </select>
             </div>
-
-            <form action="{{ url_for('hotel.add_room', hotel_id=hotel_id) }}" method="post" class="space-y-4" data-submit-form>
-                <div>
-                    <label for="room-number" class="block text-sm font-medium text-slate-700">Số phòng <span class="text-red-600" aria-hidden="true">*</span></label>
-                    <input id="room-number" name="room_number" type="text" required maxlength="20" value="{{ form_data.get('room_number', '') }}" aria-describedby="room-number-error" class="mt-1.5 min-h-11 w-full rounded-xl border {% if errors.get('room_number') %}border-red-400 bg-red-50{% else %}border-slate-300 bg-white{% endif %} px-3.5 py-2.5 text-slate-900 outline-none transition placeholder:text-slate-400 focus-visible:border-cyan-600 focus-visible:ring-2 focus-visible:ring-cyan-200 motion-reduce:transition-none" placeholder="Ví dụ: 101">
-                    {% if errors.get('room_number') %}<p id="room-number-error" class="mt-1.5 text-sm text-red-600">{{ errors.room_number }}</p>{% endif %}
-                </div>
-
-                <div>
-                    <label for="room-type" class="block text-sm font-medium text-slate-700">Loại phòng <span class="text-red-600" aria-hidden="true">*</span></label>
-                    <input id="room-type" name="room_type" type="text" required maxlength="50" list="room-type-options" value="{{ form_data.get('room_type', '') }}" aria-describedby="room-type-error" class="mt-1.5 min-h-11 w-full rounded-xl border {% if errors.get('room_type') %}border-red-400 bg-red-50{% else %}border-slate-300 bg-white{% endif %} px-3.5 py-2.5 text-slate-900 outline-none transition placeholder:text-slate-400 focus-visible:border-cyan-600 focus-visible:ring-2 focus-visible:ring-cyan-200 motion-reduce:transition-none" placeholder="Standard, Deluxe, Suite...">
-                    <datalist id="room-type-options">
-                        <option value="Standard"></option>
-                        <option value="Deluxe"></option>
-                        <option value="Suite"></option>
-                        <option value="VIP"></option>
-                    </datalist>
-                    {% if errors.get('room_type') %}<p id="room-type-error" class="mt-1.5 text-sm text-red-600">{{ errors.room_type }}</p>{% endif %}
-                </div>
-
-                <div>
-                    <label for="room-price" class="block text-sm font-medium text-slate-700">Giá phòng / đêm (đ) <span class="text-red-600" aria-hidden="true">*</span></label>
-                    <input id="room-price" name="price_per_night" type="number" required min="0" step="1000" inputmode="decimal" value="{{ form_data.get('price_per_night', '') }}" aria-describedby="room-price-error" class="mt-1.5 min-h-11 w-full rounded-xl border {% if errors.get('price_per_night') %}border-red-400 bg-red-50{% else %}border-slate-300 bg-white{% endif %} px-3.5 py-2.5 text-slate-900 outline-none transition placeholder:text-slate-400 focus-visible:border-cyan-600 focus-visible:ring-2 focus-visible:ring-cyan-200 motion-reduce:transition-none" placeholder="1500000">
-                    {% if errors.get('price_per_night') %}<p id="room-price-error" class="mt-1.5 text-sm text-red-600">{{ errors.price_per_night }}</p>{% endif %}
-                </div>
-
-                <div class="flex items-center gap-2.5 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3">
-                    <input id="room-available" name="is_available" type="checkbox" value="on" checked class="h-4 w-4 rounded border-slate-300 text-cyan-700 focus-visible:ring-2 focus-visible:ring-cyan-500">
-                    <label for="room-available" class="text-sm font-medium text-slate-700">Phòng đang trống, sẵn sàng cho thuê</label>
-                </div>
-
-                <button type="submit" class="inline-flex min-h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-cyan-700 px-4 py-2.5 font-semibold text-white shadow-sm transition hover:bg-cyan-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-600 focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-60 motion-reduce:transition-none" data-submit-button data-submitting-text="Đang thêm phòng...">
-                    <i class="bi bi-plus-lg" aria-hidden="true"></i>
-                    Thêm phòng
+            <div>
+                <label for="filter-status" class="block text-xs font-semibold text-slate-500 mb-1">Trạng thái</label>
+                <select id="filter-status" name="status" class="min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus-visible:border-cyan-600 focus-visible:ring-2 focus-visible:ring-cyan-200">
+                    <option value="">Tất cả trạng thái</option>
+                    {% for value, label in room_statuses %}
+                        <option value="{{ value }}" {% if filter_status == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label for="filter-capacity" class="block text-xs font-semibold text-slate-500 mb-1">Sức chứa tối thiểu</label>
+                <input id="filter-capacity" name="min_capacity" type="number" min="1" step="1" value="{{ filter_min_capacity }}" placeholder="Ví dụ: 4" class="min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus-visible:border-cyan-600 focus-visible:ring-2 focus-visible:ring-cyan-200">
+            </div>
+            <div class="flex gap-2">
+                <button type="submit" class="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-cyan-700 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-cyan-800 transition">
+                    <i class="bi bi-funnel"></i> Lọc
                 </button>
-            </form>
-        </aside>
-
-        <div class="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-            <div class="border-b border-slate-200 px-5 py-4 sm:px-6">
-                <h2 class="font-semibold text-slate-950">Danh sách phòng</h2>
+                {% if filter_room_type or filter_status or filter_min_capacity %}
+                <a href="{{ url_for('hotel.list_rooms', hotel_id=hotel_id) }}" class="inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition">Xóa lọc</a>
+                {% endif %}
             </div>
+        </div>
+    </form>
 
-            {% if rooms %}
-                <div class="overflow-x-auto">
-                    <table class="w-full min-w-[640px] text-left text-sm">
-                        <thead class="bg-slate-50 text-xs uppercase tracking-wider text-slate-500">
-                            <tr>
-                                <th scope="col" class="px-5 py-3.5 sm:px-6">Số phòng</th>
-                                <th scope="col" class="px-5 py-3.5">Loại phòng</th>
-                                <th scope="col" class="px-5 py-3.5">Giá / đêm</th>
-                                <th scope="col" class="px-5 py-3.5 sm:px-6">Trạng thái</th>
+    <div class="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div class="border-b border-slate-200 px-5 py-4 sm:px-6 flex items-center justify-between">
+            <div>
+                <h2 class="font-semibold text-slate-950">Danh sách phòng</h2>
+                <p class="mt-0.5 text-sm text-slate-500">Query Q1 — chỉ đọc đúng partition <code class="text-cyan-700">hotel_id = {{ hotel_id }}</code></p>
+            </div>
+            <span class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700">
+                <span class="h-2 w-2 rounded-full bg-emerald-500" aria-hidden="true"></span>
+                {% if filter_room_type or filter_status or filter_min_capacity %}
+                    {{ rooms|length }} / {{ total_room_count }} phòng
+                {% else %}
+                    {{ rooms|length }} phòng
+                {% endif %}
+            </span>
+        </div>
+
+        {% if rooms %}
+            <div class="overflow-x-auto">
+                <table class="w-full min-w-[760px] text-left text-sm">
+                    <thead class="bg-slate-50 text-xs uppercase tracking-wider text-slate-500">
+                        <tr>
+                            <th scope="col" class="px-5 py-3.5 sm:px-6">Số phòng</th>
+                            <th scope="col" class="px-5 py-3.5">Loại phòng</th>
+                            <th scope="col" class="px-5 py-3.5">Sức chứa</th>
+                            <th scope="col" class="px-5 py-3.5">Loại giường</th>
+                            <th scope="col" class="px-5 py-3.5">Giá / đêm</th>
+                            <th scope="col" class="px-5 py-3.5">Trạng thái</th>
+                            <th scope="col" class="px-5 py-3.5 text-right sm:px-6">Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                        {% for room in rooms %}
+                            <tr class="align-top transition hover:bg-slate-50/80 motion-reduce:transition-none">
+                                <td class="px-5 py-4 sm:px-6 font-semibold text-slate-900">{{ room.room_number }}</td>
+                                <td class="px-5 py-4 text-slate-600">{{ room.room_type }}</td>
+                                <td class="px-5 py-4 text-slate-600">{{ room.capacity or '—' }} người</td>
+                                <td class="px-5 py-4 text-slate-600">{{ room.bed_type or '—' }}</td>
+                                <td class="px-5 py-4 text-slate-600">{{ "{:,.0f}".format(room.price_per_night) }} đ</td>
+                                <td class="px-5 py-4">
+                                    {% if room.status == 'AVAILABLE' %}
+                                        <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+                                            <span class="h-1.5 w-1.5 rounded-full bg-emerald-500" aria-hidden="true"></span> Đang trống
+                                        </span>
+                                    {% elif room.status == 'OCCUPIED' %}
+                                        <span class="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">
+                                            <span class="h-1.5 w-1.5 rounded-full bg-amber-500" aria-hidden="true"></span> Đang cho thuê
+                                        </span>
+                                    {% else %}
+                                        <span class="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+                                            <span class="h-1.5 w-1.5 rounded-full bg-slate-500" aria-hidden="true"></span> Đang bảo trì
+                                        </span>
+                                    {% endif %}
+                                </td>
+                                <td class="px-5 py-4 text-right sm:px-6">
+                                    <a href="{{ url_for('hotel.room_detail', hotel_id=hotel_id, room_number=room.room_number) }}" class="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-cyan-200 bg-cyan-50 px-3 py-1.5 text-xs font-semibold text-cyan-800 transition hover:border-cyan-300 hover:bg-cyan-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500">
+                                        <i class="bi bi-eye" aria-hidden="true"></i> Xem chi tiết
+                                    </a>
+                                </td>
                             </tr>
-                        </thead>
-                        <tbody class="divide-y divide-slate-100">
-                            {% for room in rooms %}
-                                <tr class="align-top transition hover:bg-slate-50/80 motion-reduce:transition-none">
-                                    <td class="px-5 py-4 sm:px-6 font-semibold text-slate-900">{{ room.room_number }}</td>
-                                    <td class="px-5 py-4 text-slate-600">{{ room.room_type }}</td>
-                                    <td class="px-5 py-4 text-slate-600">{{ "{:,.0f}".format(room.price_per_night) }} đ</td>
-                                    <td class="px-5 py-4 sm:px-6">
-                                        {% if room.is_available %}
-                                            <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
-                                                <span class="h-1.5 w-1.5 rounded-full bg-emerald-500" aria-hidden="true"></span> Đang trống
-                                            </span>
-                                        {% else %}
-                                            <span class="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">
-                                                <span class="h-1.5 w-1.5 rounded-full bg-amber-500" aria-hidden="true"></span> Đã đặt
-                                            </span>
-                                        {% endif %}
-                                    </td>
-                                </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            {% else %}
-                <div class="px-6 py-14 text-center">
-                    <span class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-500" aria-hidden="true"><i class="bi bi-door-closed"></i></span>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="px-6 py-14 text-center">
+                <span class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-500" aria-hidden="true"><i class="bi bi-door-closed"></i></span>
+                {% if filter_room_type or filter_status or filter_min_capacity %}
+                    <h3 class="mt-4 font-semibold text-slate-900">Không có phòng nào khớp bộ lọc</h3>
+                    <p class="mx-auto mt-1 max-w-sm text-sm text-slate-500">Thử bỏ bớt điều kiện lọc hoặc bấm "Xóa lọc" ở trên.</p>
+                {% else %}
                     <h3 class="mt-4 font-semibold text-slate-900">Chưa có phòng nào</h3>
                     <p class="mx-auto mt-1 max-w-sm text-sm text-slate-500">Thêm phòng đầu tiên cho khách sạn này để bắt đầu quản lý.</p>
-                    <a href="#room-form" class="mt-4 inline-flex min-h-11 items-center rounded-lg px-3 font-semibold text-cyan-700 hover:bg-cyan-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500">Đi tới biểu mẫu</a>
-                </div>
-            {% endif %}
-        </div>
+                    <a href="{{ url_for('hotel.new_room_form', hotel_id=hotel_id) }}" class="mt-4 inline-flex min-h-11 items-center rounded-lg px-3 font-semibold text-cyan-700 hover:bg-cyan-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500">+ Thêm phòng mới</a>
+                {% endif %}
+            </div>
+        {% endif %}
     </div>
 </section>
 {% endblock %}

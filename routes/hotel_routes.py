@@ -9,7 +9,7 @@ import re
 
 from flask import Blueprint, flash, jsonify, redirect, render_template, request, url_for
 
-from services import hotel_service, location_service
+from services import hotel_service, location_service, room_service
 
 hotel_bp = Blueprint('hotel', __name__)
 
@@ -222,21 +222,99 @@ def delete_hotel(hotel_id):
 
 
 # --------------------------------------------------------------------
-# ROUTE PHÒNG (QUERY Q1: Tìm phòng theo khách sạn)
+# ROUTE PHÒNG (QUERY Q1: Tìm phòng theo khách sạn) — MỞ RỘNG: trang riêng cho
+# danh sách / thêm / chi tiết / sửa / đổi trạng thái. Dùng room_service.py
+# (KHÔNG dùng hotel_service.get_rooms_by_hotel/create_room cho các trang này nữa).
 # --------------------------------------------------------------------
+
+def _validate_room_fields(form):
+    """Validate các trường chung cho form Thêm phòng / Sửa phòng (không gồm room_number)."""
+    data = {
+        'room_type': form.get('room_type', '').strip(),
+        'price_per_night': form.get('price_per_night', '').strip(),
+        'capacity': form.get('capacity', '').strip(),
+        'bed_type': form.get('bed_type', '').strip(),
+        'description': form.get('description', '').strip(),
+    }
+    labels = {
+        'room_type': 'Loại phòng',
+        'price_per_night': 'Giá phòng/đêm',
+        'capacity': 'Sức chứa',
+        'bed_type': 'Loại giường',
+    }
+    errors = {
+        field: f'{label} không được để trống.'
+        for field, label in labels.items()
+        if not data[field]
+    }
+    if not errors.get('price_per_night') and data['price_per_night']:
+        try:
+            if Decimal(data['price_per_night']) <= 0:
+                errors['price_per_night'] = 'Giá phòng phải lớn hơn 0.'
+        except InvalidOperation:
+            errors['price_per_night'] = 'Giá phòng phải là số hợp lệ.'
+    if not errors.get('capacity') and data['capacity']:
+        try:
+            if int(data['capacity']) <= 0:
+                errors['capacity'] = 'Sức chứa phải lớn hơn 0.'
+        except ValueError:
+            errors['capacity'] = 'Sức chứa phải là số nguyên.'
+    return data, errors
+
 
 @hotel_bp.route('/hotels/<hotel_id>/rooms', methods=['GET'])
 def list_rooms(hotel_id):
-    """Hiển thị form thêm phòng và danh sách phòng theo khách sạn (Query Q1)."""
+    """
+    Chỉ hiển thị danh sách phòng theo khách sạn (Query Q1). Thêm phòng có trang riêng.
+
+    Bộ lọc theo loại phòng / sức chứa tối thiểu / trạng thái KHÔNG cần thêm câu
+    CQL nào cả — vẫn dùng đúng room_service.get_rooms_by_hotel(hotel_id) (Query Q1),
+    lọc thêm bằng list comprehension trên kết quả đã có sẵn trong bộ nhớ. Vì dữ liệu
+    đã được Cassandra thu hẹp về đúng 1 partition (1 khách sạn), số phòng nhỏ, nên
+    lọc tiếp ở Python là hợp lý — không cần ALLOW FILTERING hay bảng phụ nào.
+    """
     hotel = hotel_service.get_hotel_by_id(hotel_id)
-    all_hotels = hotel_service.get_all_hotels()
-    rooms = hotel_service.get_rooms_by_hotel(hotel_id)
+    all_rooms = room_service.get_rooms_by_hotel(hotel_id)
+
+    # Danh sách loại phòng có thật trong khách sạn này, để đổ vào dropdown lọc
+    room_type_options = sorted({r.room_type for r in all_rooms if r.room_type})
+
+    filter_room_type = request.args.get('room_type', '').strip()
+    filter_status = request.args.get('status', '').strip()
+    filter_min_capacity_raw = request.args.get('min_capacity', '').strip()
+    filter_min_capacity = int(filter_min_capacity_raw) if filter_min_capacity_raw.isdigit() else None
+
+    rooms = all_rooms
+    if filter_room_type:
+        rooms = [r for r in rooms if r.room_type == filter_room_type]
+    if filter_status:
+        rooms = [r for r in rooms if r.status == filter_status]
+    if filter_min_capacity:
+        rooms = [r for r in rooms if (r.capacity or 0) >= filter_min_capacity]
+
     return render_template(
         'rooms.html',
         hotel_id=hotel_id,
         hotel=hotel,
-        all_hotels=all_hotels,
         rooms=rooms,
+        total_room_count=len(all_rooms),
+        room_type_options=room_type_options,
+        room_statuses=room_service.ROOM_STATUSES,
+        filter_room_type=filter_room_type,
+        filter_status=filter_status,
+        filter_min_capacity=filter_min_capacity_raw,
+    )
+
+
+@hotel_bp.route('/hotels/<hotel_id>/rooms/new', methods=['GET'])
+def new_room_form(hotel_id):
+    """Trang riêng: form thêm phòng mới."""
+    hotel = hotel_service.get_hotel_by_id(hotel_id)
+    return render_template(
+        'room_form.html',
+        hotel_id=hotel_id,
+        hotel=hotel,
+        room=None,
         form_data={},
         errors={},
     )
@@ -244,71 +322,151 @@ def list_rooms(hotel_id):
 
 @hotel_bp.route('/hotels/<hotel_id>/rooms/add', methods=['POST'])
 def add_room(hotel_id):
-    """Validate form và thêm phòng mới vào partition của khách sạn hotel_id."""
-    form_data = {
-        'room_number': request.form.get('room_number', '').strip(),
-        'room_type': request.form.get('room_type', '').strip(),
-        'price_per_night': request.form.get('price_per_night', '').strip(),
-        'is_available': request.form.get('is_available', ''),
-    }
-    field_labels = {
-        'room_number': 'Số phòng',
-        'room_type': 'Loại phòng',
-        'price_per_night': 'Giá phòng/đêm',
-    }
-    errors = {
-        field: f'{label} không được để trống.'
-        for field, label in field_labels.items()
-        if not form_data[field]
-    }
+    """Validate và tạo phòng mới (bao gồm kiểm tra trùng room_number)."""
+    hotel = hotel_service.get_hotel_by_id(hotel_id)
+    room_number = request.form.get('room_number', '').strip()
+    data, errors = _validate_room_fields(request.form)
+    if not room_number:
+        errors['room_number'] = 'Số phòng không được để trống.'
 
-    if not errors.get('price_per_night') and form_data['price_per_night']:
-        try:
-            if Decimal(form_data['price_per_night']) <= 0:
-                errors['price_per_night'] = 'Giá phòng phải lớn hơn 0.'
-        except InvalidOperation:
-            errors['price_per_night'] = 'Giá phòng phải là số hợp lệ.'
+    if not errors.get('room_number') and room_number:
+        existing_rooms = room_service.get_rooms_by_hotel(hotel_id)
+        if any(getattr(r, 'room_number', None) == room_number for r in existing_rooms):
+            errors['room_number'] = f'Phòng {room_number} đã tồn tại trong khách sạn này.'
+
+    form_data = {'room_number': room_number, **data}
 
     if errors:
         flash('Vui lòng kiểm tra lại các trường bắt buộc.', 'error')
-        hotel = hotel_service.get_hotel_by_id(hotel_id)
-        all_hotels = hotel_service.get_all_hotels()
-        rooms = hotel_service.get_rooms_by_hotel(hotel_id)
         return render_template(
-            'rooms.html',
+            'room_form.html',
             hotel_id=hotel_id,
             hotel=hotel,
-            all_hotels=all_hotels,
-            rooms=rooms,
+            room=None,
             form_data=form_data,
             errors=errors,
         ), 400
 
-    is_available = form_data['is_available'].strip().lower() in {'1', 'true', 'yes', 'on'}
-    created = hotel_service.create_room(
-        hotel_id,
-        form_data['room_number'],
-        form_data['room_type'],
-        form_data['price_per_night'],
-        is_available,
+    created = room_service.create_room(
+        hotel_id, room_number, data['room_type'], data['price_per_night'],
+        data['capacity'], data['bed_type'], data['description'],
     )
     if created:
-        flash(f'Đã thêm phòng {form_data["room_number"]} thành công.', 'success')
+        flash(f'Đã thêm phòng {room_number} thành công.', 'success')
         return redirect(url_for('hotel.list_rooms', hotel_id=hotel_id))
 
     flash('Không thể thêm phòng. Vui lòng kiểm tra kết nối Astra DB.', 'error')
-    hotel = hotel_service.get_hotel_by_id(hotel_id)
-    all_hotels = hotel_service.get_all_hotels()
-    rooms = hotel_service.get_rooms_by_hotel(hotel_id)
     return render_template(
-        'rooms.html',
+        'room_form.html',
         hotel_id=hotel_id,
         hotel=hotel,
-        all_hotels=all_hotels,
-        rooms=rooms,
+        room=None,
         form_data=form_data,
         errors={},
     ), 503
+
+
+@hotel_bp.route('/hotels/<hotel_id>/rooms/<room_number>', methods=['GET'])
+def room_detail(hotel_id, room_number):
+    """Trang chi tiết 1 phòng, gồm cả hành động đổi trạng thái theo đúng ràng buộc."""
+    room = room_service.get_room(hotel_id, room_number)
+    if not room:
+        flash(f'Không tìm thấy phòng {room_number} trong khách sạn này.', 'error')
+        return redirect(url_for('hotel.list_rooms', hotel_id=hotel_id))
+    hotel = hotel_service.get_hotel_by_id(hotel_id)
+    return render_template(
+        'room_detail.html',
+        hotel_id=hotel_id,
+        hotel=hotel,
+        room=room,
+        status_labels=room_service.ROOM_STATUS_LABELS,
+        status_actions=room_service.get_status_actions(room.status),
+    )
+
+
+@hotel_bp.route('/hotels/<hotel_id>/rooms/<room_number>/edit', methods=['GET'])
+def edit_room_form(hotel_id, room_number):
+    """Trang riêng: form sửa thông tin phòng — chặn truy cập nếu phòng đang cho thuê."""
+    room = room_service.get_room(hotel_id, room_number)
+    if not room:
+        flash(f'Không tìm thấy phòng {room_number} trong khách sạn này.', 'error')
+        return redirect(url_for('hotel.list_rooms', hotel_id=hotel_id))
+    if room.status == 'OCCUPIED':
+        flash('Phòng đang có khách thuê, không thể sửa thông tin.', 'error')
+        return redirect(url_for('hotel.room_detail', hotel_id=hotel_id, room_number=room_number))
+
+    hotel = hotel_service.get_hotel_by_id(hotel_id)
+    form_data = {
+        'room_type': room.room_type or '',
+        'price_per_night': str(room.price_per_night) if room.price_per_night is not None else '',
+        'capacity': str(room.capacity) if room.capacity is not None else '',
+        'bed_type': room.bed_type or '',
+        'description': room.description or '',
+    }
+    return render_template(
+        'room_form.html',
+        hotel_id=hotel_id,
+        hotel=hotel,
+        room=room,
+        form_data=form_data,
+        errors={},
+    )
+
+
+@hotel_bp.route('/hotels/<hotel_id>/rooms/<room_number>/edit', methods=['POST'])
+def update_room(hotel_id, room_number):
+    """Xử lý sửa thông tin phòng — chặn nếu phòng đang cho thuê."""
+    room = room_service.get_room(hotel_id, room_number)
+    if not room:
+        flash(f'Không tìm thấy phòng {room_number} trong khách sạn này.', 'error')
+        return redirect(url_for('hotel.list_rooms', hotel_id=hotel_id))
+    if room.status == 'OCCUPIED':
+        flash('Phòng đang có khách thuê, không thể sửa thông tin.', 'error')
+        return redirect(url_for('hotel.room_detail', hotel_id=hotel_id, room_number=room_number))
+
+    hotel = hotel_service.get_hotel_by_id(hotel_id)
+    data, errors = _validate_room_fields(request.form)
+    if errors:
+        flash('Vui lòng kiểm tra lại các trường bắt buộc.', 'error')
+        return render_template(
+            'room_form.html',
+            hotel_id=hotel_id,
+            hotel=hotel,
+            room=room,
+            form_data=data,
+            errors=errors,
+        ), 400
+
+    ok, error_message = room_service.update_room(
+        hotel_id, room_number, data['room_type'], data['price_per_night'],
+        data['capacity'], data['bed_type'], data['description'],
+    )
+    if ok:
+        flash(f'Đã cập nhật thông tin phòng {room_number}.', 'success')
+        return redirect(url_for('hotel.room_detail', hotel_id=hotel_id, room_number=room_number))
+
+    flash(error_message or 'Không thể sửa phòng.', 'error')
+    return render_template(
+        'room_form.html',
+        hotel_id=hotel_id,
+        hotel=hotel,
+        room=room,
+        form_data=data,
+        errors={},
+    ), 400
+
+
+@hotel_bp.route('/hotels/<hotel_id>/rooms/<room_number>/status', methods=['POST'])
+def change_room_status(hotel_id, room_number):
+    """Đổi trạng thái phòng (Trống / Đang thuê / Bảo trì) theo đúng ma trận cho phép."""
+    new_status = request.form.get('status', '').strip()
+    ok, error_message = room_service.change_room_status(hotel_id, room_number, new_status)
+    if ok:
+        label = room_service.ROOM_STATUS_LABELS.get(new_status, new_status)
+        flash(f'Đã chuyển phòng {room_number} sang trạng thái "{label}".', 'success')
+    else:
+        flash(error_message or 'Không thể đổi trạng thái phòng.', 'error')
+    return redirect(url_for('hotel.room_detail', hotel_id=hotel_id, room_number=room_number))
 
 
 # --------------------------------------------------------------------

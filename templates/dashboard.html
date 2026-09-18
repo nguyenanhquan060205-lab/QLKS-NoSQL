@@ -3,67 +3,17 @@
 {% block title %}Dashboard Thống Kê - QLKS NoSQL{% endblock %}
 
 {% block content %}
-<!-- ================================================================
-     PHỤ TRÁCH: NHƯ (Thống kê & Dashboard)
-     
-     TODO (Như):
-     1. Thiết kế các Card thống kê tổng số (khách sạn, phòng trống, lượt đặt, doanh thu) từ biến `stats`
-        bằng Tailwind CSS (grid, grid-cols-1 md:grid-cols-4, bg-white, rounded-2xl, shadow-sm...)
-     2. (Nâng cao) Nhúng Chart.js vẽ biểu đồ doanh thu hoặc trạng thái phòng
-================================================================ -->
-
 <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
     <div>
         <h1 class="text-2xl font-bold text-slate-900 flex items-center gap-2">
             <span>📊</span> Dashboard Thống Kê
         </h1>
-        <p class="text-sm text-slate-500 mt-1">Tổng quan chỉ số hoạt động của chuỗi khách sạn NoSQL</p>
-    </div>
-</div>
-
-<!-- 4 THẺ CARD CHỈ SỐ TỔNG QUAN -->
-<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-
-    <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm hover:shadow-md transition">
-        <div class="flex items-center justify-between mb-2">
-            <span class="text-sm font-medium text-slate-500">Tổng khách sạn</span>
-            <span class="w-9 h-9 rounded-xl bg-indigo-100 text-indigo-600 flex items-center justify-center">
-                <i class="bi bi-building"></i>
-            </span>
-        </div>
-        <p class="text-3xl font-extrabold text-slate-900">{{ stats.total_hotels }}</p>
-    </div>
-
-    <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm hover:shadow-md transition">
-        <div class="flex items-center justify-between mb-2">
-            <span class="text-sm font-medium text-slate-500">Tổng số phòng</span>
-            <span class="w-9 h-9 rounded-xl bg-cyan-100 text-cyan-600 flex items-center justify-center">
-                <i class="bi bi-door-open"></i>
-            </span>
-        </div>
-        <p class="text-3xl font-extrabold text-slate-900">{{ stats.total_rooms }}</p>
-        <p class="text-xs text-emerald-600 font-medium mt-1">{{ stats.available_rooms }} phòng đang trống</p>
-    </div>
-
-    <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm hover:shadow-md transition">
-        <div class="flex items-center justify-between mb-2">
-            <span class="text-sm font-medium text-slate-500">Lượt đặt phòng</span>
-            <span class="w-9 h-9 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center">
-                <i class="bi bi-calendar-check"></i>
-            </span>
-        </div>
-        <p class="text-3xl font-extrabold text-slate-900">{{ stats.total_bookings }}</p>
-    </div>
-
-    <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm hover:shadow-md transition">
-        <div class="flex items-center justify-between mb-2">
-            <span class="text-sm font-medium text-slate-500">Tổng doanh thu</span>
-            <span class="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center">
-                <i class="bi bi-cash-stack"></i>
-            </span>
-        </div>
-        <p class="text-2xl font-extrabold text-slate-900">
-            {{ "{:,.0f}".format(stats.total_revenue) }} <span class="text-sm font-medium text-slate-400">đ</span>
+        <p class="text-sm text-slate-500 mt-1">
+            {% if stats.selected_hotel_name %}
+                Đang xem: <strong class="text-slate-800">{{ stats.selected_hotel_name }}</strong> · {{ stats.period_label }}
+            {% else %}
+                Toàn hệ thống · {{ stats.period_label }}
+            {% endif %}
         </p>
     </div>
     <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">
@@ -71,9 +21,6 @@
     </span>
 </div>
 
-<<<<<<< Updated upstream
-<!-- BIỂU ĐỒ TRẠNG THÁI PHÒNG (Chart.js) -->
-=======
 <!-- BỘ LỌC: KHÁCH SẠN + KỲ BÁO CÁO -->
 <form method="get" action="{{ url_for('dashboard.dashboard') }}" id="dashboard-filter-form" class="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 shadow-sm mb-6">
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end">
@@ -174,26 +121,94 @@
 
 <!-- SO SÁNH GIỮA CÁC KHÁCH SẠN (chỉ hiện khi đang xem "Tất cả khách sạn") -->
 {% if stats.hotel_breakdown %}
->>>>>>> Stashed changes
 <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-    <h3 class="font-semibold text-slate-800 mb-4">Tỉ lệ phòng trống / đã đặt</h3>
-    {% if stats.total_rooms > 0 %}
-    <div class="max-w-xs mx-auto">
-        <canvas id="roomStatusChart"></canvas>
+    <h3 class="font-semibold text-slate-800 mb-1">So sánh giữa các khách sạn</h3>
+    <p class="text-xs text-slate-500 mb-4">Xếp theo doanh thu trong kỳ đã lọc, cao đến thấp</p>
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="max-h-72">
+            <canvas id="hotelRevenueChart"></canvas>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm">
+                <thead class="bg-slate-50 text-xs uppercase tracking-wider text-slate-500">
+                    <tr>
+                        <th class="px-4 py-2.5">Khách sạn</th>
+                        <th class="px-4 py-2.5 text-right">Phòng</th>
+                        <th class="px-4 py-2.5 text-right">Lượt đặt</th>
+                        <th class="px-4 py-2.5 text-right">Doanh thu</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    {% for h in stats.hotel_breakdown %}
+                        <tr>
+                            <td class="px-4 py-2.5 font-medium text-slate-800">
+                                {{ h.name }}
+                                <a href="{{ url_for('dashboard.dashboard', hotel_id=h.hotel_id, period=stats.period, start_date=stats.custom_start, end_date=stats.custom_end) }}" class="ml-1 text-xs text-indigo-600 hover:underline">xem riêng</a>
+                            </td>
+                            <td class="px-4 py-2.5 text-right text-slate-600">{{ h.available_rooms }}/{{ h.total_rooms }} trống</td>
+                            <td class="px-4 py-2.5 text-right text-slate-600">{{ h.total_bookings }}</td>
+                            <td class="px-4 py-2.5 text-right font-semibold text-slate-900">{{ "{:,.0f}".format(h.total_revenue) }} đ</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </div>
-    {% else %}
-    <p class="text-sm text-slate-500 text-center py-8">Chưa có dữ liệu phòng để vẽ biểu đồ.</p>
-    {% endif %}
 </div>
+{% endif %}
 
 {% endblock %}
 
 {% block scripts %}
-{% if stats.total_rooms > 0 %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 <script>
-    const ctx = document.getElementById('roomStatusChart');
-    new Chart(ctx, {
+    // Ẩn/hiện 2 ô ngày tùy chọn dựa theo lựa chọn kỳ báo cáo
+    const periodSelect = document.getElementById('filter-period');
+    const customFields = document.getElementById('custom-date-fields');
+    function toggleCustomFields() {
+        customFields.style.display = periodSelect.value === 'custom' ? 'contents' : 'none';
+    }
+    if (periodSelect && customFields) {
+        toggleCustomFields();
+        periodSelect.addEventListener('change', toggleCustomFields);
+    }
+
+    // Chặn chọn "Đến ngày" trước "Từ ngày" ngay từ giao diện (bổ sung cho ràng buộc phía server)
+    const startInput = document.getElementById('filter-start');
+    const endInput = document.getElementById('filter-end');
+    function syncDateBounds() {
+        if (startInput.value) endInput.min = startInput.value;
+        if (endInput.value) startInput.max = endInput.value;
+    }
+    if (startInput && endInput) {
+        syncDateBounds();
+        startInput.addEventListener('change', syncDateBounds);
+        endInput.addEventListener('change', syncDateBounds);
+    }
+
+    {% if stats.revenue_labels %}
+    new Chart(document.getElementById('revenueChart'), {
+        type: 'line',
+        data: {
+            labels: {{ stats.revenue_labels | tojson }},
+            datasets: [{
+                label: 'Doanh thu (đ)',
+                data: {{ stats.revenue_values | tojson }},
+                borderColor: '#059669',
+                backgroundColor: 'rgba(5, 150, 105, 0.1)',
+                tension: 0.3,
+                fill: true,
+            }]
+        },
+        options: {
+            plugins: { legend: { display: false } },
+            scales: { y: { ticks: { callback: (v) => v.toLocaleString('vi-VN') } } }
+        }
+    });
+    {% endif %}
+
+    {% if stats.total_rooms > 0 %}
+    new Chart(document.getElementById('roomStatusChart'), {
         type: 'doughnut',
         data: {
             labels: ['Phòng trống', 'Phòng đã đặt'],
@@ -203,10 +218,28 @@
                 borderWidth: 0
             }]
         },
+        options: { plugins: { legend: { position: 'bottom' } } }
+    });
+    {% endif %}
+
+    {% if stats.hotel_breakdown %}
+    new Chart(document.getElementById('hotelRevenueChart'), {
+        type: 'bar',
+        data: {
+            labels: {{ stats.hotel_breakdown | map(attribute='name') | list | tojson }},
+            datasets: [{
+                label: 'Doanh thu (đ)',
+                data: {{ stats.hotel_breakdown | map(attribute='total_revenue') | list | tojson }},
+                backgroundColor: '#4f46e5',
+                borderRadius: 6,
+            }]
+        },
         options: {
-            plugins: { legend: { position: 'bottom' } }
+            indexAxis: 'y',
+            plugins: { legend: { display: false } },
+            scales: { x: { ticks: { callback: (v) => v.toLocaleString('vi-VN') } } }
         }
     });
+    {% endif %}
 </script>
-{% endif %}
 {% endblock %}
