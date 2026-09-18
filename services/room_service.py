@@ -472,6 +472,11 @@ def change_room_status(hotel_id, room_number, new_status, guest_name=None, booki
         guest_name = None
         booking_id = None
 
+    # Gán TRƯỚC khi rẽ nhánh session: cả nhánh mock lẫn 2 câu UPDATE bên dưới đều
+    # dùng biến này. Trước đó nó bị thiếu nên mọi lần đổi trạng thái đều nổ
+    # UnboundLocalError, rơi vào except rồi báo sai thành "Lỗi kết nối AstraDB".
+    is_available = new_status == "AVAILABLE"
+
     session = get_session()
     if not session:
         # Mock fallback
@@ -486,10 +491,12 @@ def change_room_status(hotel_id, room_number, new_status, guest_name=None, booki
             SET status = ?, is_available = ?, current_guest_name = ?, current_booking_id = ?
             WHERE hotel_id = ? AND room_number = ?;
         """)
-        session.execute(stmt, (new_status, is_available, guest_name, booking_id, hotel_id, room_number))
+        session.execute(stmt, (new_status, is_available, guest_name, booking_id, hotel_id_str, room_number_str))
+        invalidate_rooms_cache()
         return True, None
     except Exception as error:
-        # Fallback nếu bảng chưa có cột status
+        # Fallback cho database cũ chưa có cột status / current_guest_name
+        print(f"⚠️ [Phòng] UPDATE đầy đủ thất bại, thử lại bản tối giản: {error}")
         try:
             stmt_basic = session.prepare("""
                 UPDATE rooms_by_hotel SET is_available = ?
@@ -501,4 +508,6 @@ def change_room_status(hotel_id, room_number, new_status, guest_name=None, booki
             return True, None
         except Exception as err2:
             print(f"❌ [Phòng] Lỗi đổi trạng thái phòng: {err2}")
-            return False, "Lỗi kết nối AstraDB, vui lòng thử lại."
+            # Nói đúng bản chất: không phải lúc nào cũng là lỗi kết nối. Trước đây
+            # message này che mất một UnboundLocalError suốt nhiều giờ.
+            return False, f"Không cập nhật được trạng thái phòng: {err2}"
