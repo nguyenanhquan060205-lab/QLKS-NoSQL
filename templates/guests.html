@@ -16,51 +16,50 @@
         </div>
 
         <div class="flex items-center gap-3">
-            <button type="button" onclick="openAddGuestModal()" class="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-gradient-to-r from-cyan-600 to-cyan-700 px-5 py-2.5 text-sm font-semibold text-white shadow-md transition hover:from-cyan-700 hover:to-cyan-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 active:scale-98">
-                <i class="bi bi-person-plus-fill text-base"></i>
+            <button type="button" onclick="openAddGuestModal()" class="inline-flex cursor-pointer items-center justify-center rounded-xl bg-cyan-700 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-cyan-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 active:scale-98">
                 <span>Thêm khách hàng mới</span>
             </button>
         </div>
     </div>
 
-    <!-- STATS CARDS -->
+    <!-- STATS CARDS (ENTERPRISE MINIMALIST) -->
     <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div class="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs transition hover:shadow-md">
+        <div class="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs transition hover:border-slate-300">
             <div class="flex items-center justify-between">
                 <div>
-                    <p class="text-xs font-medium uppercase tracking-wider text-slate-500">Tổng khách hàng</p>
-                    <p class="mt-1 text-2xl font-bold text-slate-900">{{ guests|length }}</p>
+                    <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">Tổng khách hàng</p>
+                    <p class="mt-1 text-2xl font-black text-slate-900">{{ guests|length }}</p>
                 </div>
-                <span class="flex h-12 w-12 items-center justify-center rounded-xl bg-cyan-50 text-cyan-600">
-                    <i class="bi bi-people text-2xl"></i>
+                <span class="text-xs font-semibold text-cyan-700 bg-cyan-50 px-2.5 py-1 rounded-md">
+                    Hồ sơ lưu trữ
                 </span>
             </div>
         </div>
 
-        <div class="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs transition hover:shadow-md">
+        <div class="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs transition hover:border-slate-300">
             <div class="flex items-center justify-between">
                 <div>
-                    <p class="text-xs font-medium uppercase tracking-wider text-slate-500">Hồ sơ có CCCD / Hộ chiếu</p>
-                    <p class="mt-1 text-2xl font-bold text-slate-900">
+                    <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">CCCD / Hộ chiếu</p>
+                    <p class="mt-1 text-2xl font-black text-slate-900">
                         {{ guests|selectattr('id_card')|list|length }}
                     </p>
                 </div>
-                <span class="flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
-                    <i class="bi bi-card-heading text-2xl"></i>
+                <span class="text-xs font-semibold text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-md">
+                    Đã định danh
                 </span>
             </div>
         </div>
 
-        <div class="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs transition hover:shadow-md">
+        <div class="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs transition hover:border-slate-300">
             <div class="flex items-center justify-between">
                 <div>
-                    <p class="text-xs font-medium uppercase tracking-wider text-slate-500">Đã cập nhật địa chỉ</p>
-                    <p class="mt-1 text-2xl font-bold text-emerald-600">
+                    <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">Địa chỉ cư trú</p>
+                    <p class="mt-1 text-2xl font-black text-emerald-600">
                         {{ guests|selectattr('address')|list|length }}
                     </p>
                 </div>
-                <span class="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
-                    <i class="bi bi-geo-alt text-2xl"></i>
+                <span class="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-md">
+                    Đầy đủ địa chỉ
                 </span>
             </div>
         </div>
@@ -71,8 +70,7 @@
         <!-- SEARCH BAR -->
         <div class="border-b border-slate-200/80 bg-slate-50/60 p-4">
             <div class="relative max-w-md">
-                <i class="bi bi-search absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
-                <input id="guest-search-input" type="text" oninput="filterGuestsTable()" placeholder="Tìm kiếm theo tên khách, SĐT, Email, CCCD, Địa chỉ..." class="w-full rounded-xl border border-slate-300 bg-white pl-10 pr-4 py-2 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-cyan-600 focus:ring-2 focus:ring-cyan-200">
+                <input id="guest-search-input" type="text" oninput="filterGuestsTable()" placeholder="Tìm kiếm theo tên khách, SĐT, Email, CCCD, Địa chỉ..." class="w-full rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-cyan-600 focus:ring-2 focus:ring-cyan-200">
             </div>
         </div>
 
@@ -94,28 +92,21 @@
                             <tr class="guest-row transition hover:bg-cyan-50/30" data-name="{{ guest.full_name|lower }}" data-phone="{{ guest.phone }}" data-email="{{ guest.email|lower }}" data-idcard="{{ guest.id_card }}" data-address="{{ (guest.address or '')|lower }}">
                                 <!-- KHÁCH HÀNG -->
                                 <td class="py-4 pl-6 pr-3">
-                                    <div class="flex items-center gap-3">
-                                        <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-tr from-cyan-100 to-indigo-100 text-cyan-900 font-bold text-xs shadow-2xs">
-                                            {{ guest.full_name[:2]|upper }}
-                                        </div>
-                                        <div class="min-w-0">
-                                            <p class="font-bold text-slate-900 truncate leading-snug">{{ guest.full_name }}</p>
-                                            <span class="mt-0.5 inline-block font-mono text-[11px] font-semibold text-cyan-700 bg-cyan-50 px-1.5 py-0.5 rounded border border-cyan-200/60">
-                                                {{ guest.guest_id }}
-                                            </span>
-                                        </div>
+                                    <div class="min-w-0">
+                                        <p class="font-bold text-slate-900 truncate leading-snug">{{ guest.full_name }}</p>
+                                        <span class="mt-1 inline-block font-mono text-[11px] font-semibold text-cyan-700 bg-cyan-50 px-2 py-0.5 rounded border border-cyan-200/60">
+                                            {{ guest.guest_id }}
+                                        </span>
                                     </div>
                                 </td>
 
                                 <!-- LIÊN HỆ -->
                                 <td class="px-3 py-4">
                                     <div class="flex flex-col gap-1">
-                                        <a href="tel:{{ guest.phone }}" ondblclick="copyToClipboard('{{ guest.phone }}', 'số điện thoại', event)" title="Nhấn đúp để sao chép" class="inline-flex items-center gap-1.5 font-medium text-xs text-slate-800 hover:text-cyan-700 cursor-pointer select-all">
-                                            <i class="bi bi-telephone-fill text-cyan-600 text-xs"></i>
+                                        <a href="tel:{{ guest.phone }}" ondblclick="copyToClipboard('{{ guest.phone }}', 'số điện thoại', event)" title="Nhấn đúp để sao chép" class="font-medium text-xs text-slate-800 hover:text-cyan-700 cursor-pointer select-all">
                                             <span>{{ guest.phone }}</span>
                                         </a>
-                                        <a href="mailto:{{ guest.email }}" ondblclick="copyToClipboard('{{ guest.email }}', 'email', event)" title="Nhấn đúp để sao chép" class="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-cyan-700 truncate max-w-[180px] cursor-pointer select-all">
-                                            <i class="bi bi-envelope text-slate-400 text-xs"></i>
+                                        <a href="mailto:{{ guest.email }}" ondblclick="copyToClipboard('{{ guest.email }}', 'email', event)" title="Nhấn đúp để sao chép" class="text-xs text-slate-500 hover:text-cyan-700 truncate max-w-[180px] cursor-pointer select-all">
                                             <span class="truncate">{{ guest.email }}</span>
                                         </a>
                                     </div>
@@ -123,8 +114,7 @@
 
                                 <!-- CCCD/HỘ CHIẾU -->
                                 <td class="px-3 py-4 whitespace-nowrap">
-                                    <span ondblclick="copyToClipboard('{{ guest.id_card }}', 'CCCD/Hộ chiếu', event)" title="Nhấn đúp để sao chép" class="inline-flex items-center gap-1.5 font-mono text-xs font-semibold text-slate-700 bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200/70 cursor-pointer select-all transition hover:bg-slate-200/80 hover:border-slate-300 active:scale-95">
-                                        <i class="bi bi-card-text text-slate-400"></i>
+                                    <span ondblclick="copyToClipboard('{{ guest.id_card }}', 'CCCD/Hộ chiếu', event)" title="Nhấn đúp để sao chép" class="font-mono text-xs font-semibold text-slate-700 bg-slate-100 px-2.5 py-1 rounded-md border border-slate-200/70 cursor-pointer select-all transition hover:bg-slate-200/80">
                                         <span>{{ guest.id_card }}</span>
                                     </span>
                                 </td>
@@ -132,8 +122,7 @@
                                 <!-- ĐỊA CHỈ CƯ TRÚ -->
                                 <td class="px-3 py-4">
                                     {% if guest.address %}
-                                        <p class="text-xs text-slate-700 leading-snug flex items-start gap-1">
-                                            <i class="bi bi-geo-alt-fill text-cyan-600 text-xs shrink-0 mt-0.5"></i>
+                                        <p class="text-xs text-slate-700 leading-snug">
                                             <span class="line-clamp-2">{{ guest.address }}</span>
                                         </p>
                                     {% else %}
@@ -143,15 +132,15 @@
 
                                 <!-- THAO TÁC -->
                                 <td class="py-4 pl-3 pr-6 text-right whitespace-nowrap">
-                                    <div class="inline-flex items-center gap-1">
-                                        <a href="{{ url_for('booking.history_by_guest', guest_id=guest.guest_id) }}" title="Lịch sử đặt phòng" class="inline-flex items-center gap-1 rounded-lg border border-cyan-300 bg-cyan-50 px-2.5 py-1.5 text-xs font-semibold text-cyan-800 transition hover:bg-cyan-100 shadow-2xs">
-                                            <i class="bi bi-clock-history"></i> Lịch sử
+                                    <div class="inline-flex items-center gap-1.5">
+                                        <a href="{{ url_for('booking.history_by_guest', guest_id=guest.guest_id) }}" title="Lịch sử đặt phòng" class="inline-flex items-center rounded-lg border border-cyan-300 bg-cyan-50 px-3 py-1.5 text-xs font-semibold text-cyan-800 transition hover:bg-cyan-100 shadow-2xs">
+                                            Lịch sử
                                         </a>
-                                        <button type="button" onclick="openEditGuestModal('{{ guest.guest_id }}', '{{ guest.full_name|escape }}', '{{ guest.email|escape }}', '{{ guest.phone|escape }}', '{{ guest.id_card|escape }}', '{{ (guest.address or '')|escape }}')" title="Chỉnh sửa hồ sơ" class="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-100 hover:text-cyan-700 shadow-2xs">
-                                            <i class="bi bi-pencil-square"></i> Sửa
+                                        <button type="button" onclick="openEditGuestModal('{{ guest.guest_id }}', '{{ guest.full_name|escape }}', '{{ guest.email|escape }}', '{{ guest.phone|escape }}', '{{ guest.id_card|escape }}', '{{ (guest.address or '')|escape }}')" title="Chỉnh sửa hồ sơ" class="inline-flex items-center rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-100 hover:text-cyan-700 shadow-2xs">
+                                            Sửa
                                         </button>
-                                        <button type="button" onclick="openDeleteGuestModal('{{ guest.guest_id }}', '{{ guest.full_name|escape }}')" title="Xóa hồ sơ" class="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-white px-2 py-1.5 text-xs font-medium text-red-600 transition hover:bg-red-50 shadow-2xs">
-                                            <i class="bi bi-trash3"></i> Xóa
+                                        <button type="button" onclick="openDeleteGuestModal('{{ guest.guest_id }}', '{{ guest.full_name|escape }}')" title="Xóa hồ sơ" class="inline-flex items-center rounded-lg border border-red-200 bg-white px-2.5 py-1.5 text-xs font-medium text-red-600 transition hover:bg-red-50 shadow-2xs">
+                                            Xóa
                                         </button>
                                     </div>
                                 </td>
@@ -162,13 +151,10 @@
             </div>
         {% else %}
             <div class="px-6 py-16 text-center">
-                <span class="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-cyan-50 text-cyan-700 shadow-xs" aria-hidden="true">
-                    <i class="bi bi-person-plus text-3xl"></i>
-                </span>
-                <h3 class="mt-4 text-base font-bold text-slate-900">Chưa có khách hàng nào</h3>
+                <h3 class="text-base font-bold text-slate-900">Chưa có khách hàng nào</h3>
                 <p class="mx-auto mt-1 max-w-sm text-sm text-slate-500">Thêm hồ sơ khách hàng đầu tiên để quản lý thông tin lưu trú và đặt phòng.</p>
-                <button type="button" onclick="openAddGuestModal()" class="mt-4 inline-flex items-center gap-2 rounded-xl bg-cyan-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-cyan-800">
-                    <i class="bi bi-plus-lg"></i> Thêm khách hàng
+                <button type="button" onclick="openAddGuestModal()" class="mt-4 inline-flex items-center justify-center rounded-xl bg-cyan-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-cyan-800 cursor-pointer">
+                    Thêm khách hàng
                 </button>
             </div>
         {% endif %}
@@ -176,22 +162,17 @@
 </section>
 
 <!-- ==================================================================== -->
-<!-- MODAL 1: THÊM KHÁCH HÀNG MỚI (CHỌN TỈNH, XÃ/PHƯỜNG & ĐỊA CHỈ CƯ TRÚ) -->
+<!-- MODAL 1: THÊM KHÁCH HÀNG MỚI -->
 <!-- ==================================================================== -->
 <div id="addGuestModal" class="fixed inset-0 z-50 {% if not errors %}hidden{% endif %} overflow-y-auto bg-slate-900/60 p-4 backdrop-blur-xs flex items-center justify-center" role="dialog" aria-modal="true" aria-labelledby="add-guest-title">
     <div class="w-full max-w-xl rounded-2xl bg-white p-6 shadow-2xl border border-slate-200 max-h-[92vh] overflow-y-auto">
         <div class="flex items-center justify-between border-b border-slate-100 pb-3">
-            <div class="flex items-center gap-2.5">
-                <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-cyan-100 text-cyan-700 font-bold">
-                    <i class="bi bi-person-plus-fill text-lg"></i>
-                </span>
-                <div>
-                    <h3 id="add-guest-title" class="text-lg font-bold text-slate-900">Thêm Khách Hàng Mới</h3>
-                    <p class="text-xs text-slate-500">Mã khách hàng sẽ được hệ thống tạo tự động.</p>
-                </div>
+            <div>
+                <h3 id="add-guest-title" class="text-lg font-bold text-slate-900">Thêm Khách Hàng Mới</h3>
+                <p class="text-xs text-slate-500">Mã khách hàng sẽ được hệ thống tạo tự động.</p>
             </div>
-            <button type="button" onclick="closeAddGuestModal()" class="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600" aria-label="Đóng">
-                <i class="bi bi-x-lg text-lg"></i>
+            <button type="button" onclick="closeAddGuestModal()" class="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 font-bold" aria-label="Đóng">
+                Đóng
             </button>
         </div>
 
@@ -225,8 +206,8 @@
 
             <!-- ĐỊA CHỈ CƯ TRÚ (TỈNH THÀNH & XÃ PHƯỜNG) -->
             <div class="rounded-xl border border-slate-200 bg-slate-50/60 p-3.5 space-y-3">
-                <p class="text-xs font-bold uppercase text-slate-700 flex items-center gap-1.5">
-                    <i class="bi bi-geo-alt-fill text-cyan-600"></i> Địa chỉ cư trú
+                <p class="text-xs font-bold uppercase text-slate-700">
+                    Địa chỉ cư trú
                 </p>
 
                 <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -259,8 +240,8 @@
                 <button type="button" onclick="closeAddGuestModal()" class="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50">
                     Hủy bỏ
                 </button>
-                <button type="submit" class="inline-flex items-center gap-2 rounded-xl bg-cyan-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-cyan-800 shadow-sm" data-submit-button data-submitting-text="Đang thêm...">
-                    <i class="bi bi-plus-lg"></i> Thêm khách hàng
+                <button type="submit" class="inline-flex items-center rounded-xl bg-cyan-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-cyan-800 shadow-sm" data-submit-button data-submitting-text="Đang thêm...">
+                    Thêm khách hàng
                 </button>
             </div>
         </form>
@@ -273,11 +254,11 @@
 <div id="editGuestModal" class="fixed inset-0 z-50 hidden overflow-y-auto bg-slate-900/60 p-4 backdrop-blur-xs flex items-center justify-center" role="dialog" aria-modal="true" aria-labelledby="edit-guest-title">
     <div class="w-full max-w-xl rounded-2xl bg-white p-6 shadow-2xl border border-slate-200 max-h-[92vh] overflow-y-auto">
         <div class="flex items-center justify-between border-b border-slate-100 pb-3">
-            <h3 id="edit-guest-title" class="text-lg font-bold text-slate-900 flex items-center gap-2">
-                <i class="bi bi-pencil-square text-cyan-600"></i> Chỉnh sửa Hồ sơ Khách hàng
+            <h3 id="edit-guest-title" class="text-lg font-bold text-slate-900">
+                Chỉnh sửa Hồ sơ Khách hàng
             </h3>
-            <button type="button" onclick="closeEditGuestModal()" class="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600" aria-label="Đóng">
-                <i class="bi bi-x-lg text-lg"></i>
+            <button type="button" onclick="closeEditGuestModal()" class="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 font-bold" aria-label="Đóng">
+                Đóng
             </button>
         </div>
 
@@ -313,8 +294,8 @@
                 <button type="button" onclick="closeEditGuestModal()" class="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50">
                     Hủy bỏ
                 </button>
-                <button type="submit" class="inline-flex items-center gap-2 rounded-xl bg-cyan-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-cyan-800 shadow-sm">
-                    <i class="bi bi-check2"></i> Lưu thay đổi
+                <button type="submit" class="inline-flex items-center rounded-xl bg-cyan-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-cyan-800 shadow-sm">
+                    Lưu thay đổi
                 </button>
             </div>
         </form>
@@ -326,8 +307,8 @@
 <!-- ==================================================================== -->
 <div id="deleteGuestModal" class="fixed inset-0 z-50 hidden overflow-y-auto bg-slate-900/60 p-4 backdrop-blur-xs flex items-center justify-center" role="dialog" aria-modal="true" aria-labelledby="delete-guest-title">
     <div class="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl border border-slate-200">
-        <div class="flex items-center gap-3 text-red-600">
-            <span class="flex h-11 w-11 items-center justify-center rounded-2xl bg-red-100"><i class="bi bi-exclamation-triangle text-xl"></i></span>
+        <div class="flex items-center gap-3">
+            <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-red-100 text-red-600 font-bold text-lg">!</span>
             <div>
                 <h3 id="delete-guest-title" class="text-base font-bold text-slate-900">Xác nhận xóa khách hàng</h3>
                 <p class="text-xs text-slate-500">Hành động này không thể hoàn tác.</p>
@@ -341,8 +322,8 @@
             <button type="button" onclick="closeDeleteGuestModal()" class="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50">
                 Hủy
             </button>
-            <button type="submit" class="inline-flex items-center gap-2 rounded-xl bg-red-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-red-700 shadow-sm">
-                <i class="bi bi-trash3"></i> Xóa vĩnh viễn
+            <button type="submit" class="inline-flex items-center rounded-xl bg-red-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-red-700 shadow-sm">
+                Xóa vĩnh viễn
             </button>
         </form>
     </div>
@@ -431,7 +412,7 @@
             toast = document.createElement('div');
             toast.id = 'global-copy-toast';
             toast.className = 'fixed bottom-6 right-6 z-50 flex items-center gap-2 rounded-xl bg-slate-900/90 text-white px-4 py-2.5 text-xs font-semibold shadow-2xl backdrop-blur-xs transition-all duration-300 transform translate-y-3 opacity-0 pointer-events-none';
-            toast.innerHTML = '<i class="bi bi-clipboard-check-fill text-emerald-400 text-sm"></i><span id="global-copy-toast-text"></span>';
+            toast.innerHTML = '<span class="h-1.5 w-1.5 rounded-full bg-emerald-400"></span><span id="global-copy-toast-text"></span>';
             document.body.appendChild(toast);
         }
         document.getElementById('global-copy-toast-text').textContent = message;

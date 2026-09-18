@@ -11,27 +11,27 @@
      - Các nút bấm dẫn tới Khách sạn, Đặt phòng, Dashboard
 ================================================================ -->
 
-<div class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-900 via-slate-900 to-slate-950 p-8 sm:p-12 text-white shadow-xl mb-8">
+<div class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-900 via-slate-900 to-slate-950 p-8 sm:p-12 text-white shadow-xl mb-8 border border-slate-800">
     <div class="relative z-10 max-w-3xl">
-        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 mb-4">
-            🚀 Apache Cassandra & AstraDB
+        <span class="inline-flex items-center px-3 py-1 rounded-md text-xs font-semibold bg-cyan-950 text-cyan-300 border border-cyan-800 mb-4 tracking-wider uppercase">
+            DataStax AstraDB · Cassandra NoSQL
         </span>
         <h1 class="text-3xl sm:text-5xl font-extrabold tracking-tight mb-4">
-            Hệ Thống Quản Lý Khách Sạn
+            Chuỗi Khách Sạn Mường Thanh
         </h1>
         <p class="text-slate-300 text-base sm:text-lg mb-8 leading-relaxed">
-            Đồ án môn học NoSQL: Ứng dụng mô hình dữ liệu Query-First, Denormalization và phân tán hiệu năng cao trên Cloud Database.
+            Hệ thống quản trị chuỗi lưu trú nội bộ: Quản lý 40 chi nhánh trên 34 tỉnh thành, theo dõi phòng theo thời gian thực và xử lý đặt phòng phân tán với kiến trúc Query-First.
         </p>
 
         <div class="flex flex-wrap gap-4">
-            <a href="/hotels" class="inline-flex items-center px-5 py-2.5 rounded-xl font-medium bg-cyan-500 text-slate-950 hover:bg-cyan-400 transition shadow-lg shadow-cyan-500/25">
-                <i class="bi bi-building me-2"></i> Khách sạn & Phòng
+            <a href="/hotels" class="inline-flex items-center px-5 py-2.5 rounded-xl font-semibold bg-cyan-500 text-slate-950 hover:bg-cyan-400 transition shadow-lg shadow-cyan-500/25">
+                Danh sách Chi nhánh & Phòng
             </a>
-            <a href="/bookings" class="inline-flex items-center px-5 py-2.5 rounded-xl font-medium bg-amber-500 text-slate-950 hover:bg-amber-400 transition shadow-lg shadow-amber-500/25">
-                <i class="bi bi-calendar-check me-2"></i> Đặt phòng & Hóa đơn
+            <a href="/bookings" class="inline-flex items-center px-5 py-2.5 rounded-xl font-semibold bg-amber-500 text-slate-950 hover:bg-amber-400 transition shadow-lg shadow-amber-500/25">
+                Nghiệp vụ Đặt phòng & Hóa đơn
             </a>
-            <a href="/dashboard" class="inline-flex items-center px-5 py-2.5 rounded-xl font-medium bg-slate-800 text-white hover:bg-slate-700 transition border border-slate-700">
-                <i class="bi bi-bar-chart me-2"></i> Dashboard Thống kê
+            <a href="/dashboard" class="inline-flex items-center px-5 py-2.5 rounded-xl font-semibold bg-slate-800 text-white hover:bg-slate-700 transition border border-slate-700">
+                Dashboard Thống kê
             </a>
         </div>
     </div>
@@ -41,19 +41,19 @@
 <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
     <div class="bg-white border border-slate-200 rounded-xl p-4 text-center shadow-sm">
         <p class="text-2xl font-extrabold text-indigo-600">{{ stats.total_hotels }}</p>
-        <p class="text-xs text-slate-500 mt-1">Khách sạn</p>
+        <p class="text-xs text-slate-500 mt-1">Khách sạn (34 tỉnh thành)</p>
     </div>
     <div class="bg-white border border-slate-200 rounded-xl p-4 text-center shadow-sm">
         <p class="text-2xl font-extrabold text-cyan-600">{{ stats.total_rooms }}</p>
-        <p class="text-xs text-slate-500 mt-1">Phòng ({{ stats.available_rooms }} trống)</p>
+        <p class="text-xs text-slate-500 mt-1">{{ stats.available_rooms }} trống · {{ stats.occupied_rooms }} đang ở · {{ stats.maintenance_rooms }} bảo trì</p>
     </div>
     <div class="bg-white border border-slate-200 rounded-xl p-4 text-center shadow-sm">
         <p class="text-2xl font-extrabold text-amber-600">{{ stats.total_bookings }}</p>
-        <p class="text-xs text-slate-500 mt-1">Lượt đặt phòng</p>
+        <p class="text-xs text-slate-500 mt-1">Lượt đặt phòng ({{ stats.total_guests }} khách)</p>
     </div>
     <div class="bg-white border border-slate-200 rounded-xl p-4 text-center shadow-sm">
         <p class="text-2xl font-extrabold text-emerald-600">{{ "{:,.0f}".format(stats.total_revenue) }}đ</p>
-        <p class="text-xs text-slate-500 mt-1">Doanh thu</p>
+        <p class="text-xs text-slate-500 mt-1">Doanh thu ({{ stats.total_invoices }} hóa đơn)</p>
     </div>
 </div>
 {% endblock %}

@@ -41,38 +41,47 @@ class BookingServiceAstraIntegrationTest(unittest.TestCase):
         check_out = "2026-09-23"
         guest_name = "Nguyễn Văn Test"
 
-        # 1. Thực hiện BATCH INSERT Q5
-        booking_id = booking_service.create_booking_batch(
-            guest_id=guest_id,
-            guest_name=guest_name,
-            hotel_id=hotel_id,
-            room_number=room_number,
-            check_in_date=check_in,
-            check_out_date=check_out,
-            status="CONFIRMED",
-            total_amount=3500000,
-        )
-        self.assertIsNotNone(booking_id, "Lỗi BATCH INSERT không sinh được mã booking_id")
+        booking_id = None
+        try:
+            # 1. Thực hiện BATCH INSERT Q5
+            booking_id = booking_service.create_booking_batch(
+                guest_id=guest_id,
+                guest_name=guest_name,
+                hotel_id=hotel_id,
+                room_number=room_number,
+                check_in_date=check_in,
+                check_out_date=check_out,
+                status="CONFIRMED",
+                total_amount=3500000,
+            )
+            self.assertIsNotNone(booking_id, "Lỗi BATCH INSERT không sinh được mã booking_id")
 
-        # 2. Kiểm tra Query Q2 (bookings_by_guest)
-        guest_bookings = booking_service.get_bookings_by_guest(guest_id)
-        self.assertGreaterEqual(len(guest_bookings), 1, "Query Q2 không tìm thấy bản ghi theo guest_id")
-        found_in_q2 = any(
-            (b["booking_id"] if isinstance(b, dict) else getattr(b, "booking_id", None)) == booking_id
-            for b in guest_bookings
-        )
-        self.assertTrue(found_in_q2, f"Mã booking {booking_id} không xuất hiện trong bảng bookings_by_guest")
+            # 2. Kiểm tra Query Q2 (bookings_by_guest)
+            guest_bookings = booking_service.get_bookings_by_guest(guest_id)
+            self.assertGreaterEqual(len(guest_bookings), 1, "Query Q2 không tìm thấy bản ghi theo guest_id")
+            found_in_q2 = any(
+                (b["booking_id"] if isinstance(b, dict) else getattr(b, "booking_id", None)) == booking_id
+                for b in guest_bookings
+            )
+            self.assertTrue(found_in_q2, f"Mã booking {booking_id} không xuất hiện trong bảng bookings_by_guest")
 
-        # 3. Kiểm tra Query Q3 (bookings_by_hotel_date)
-        hotel_date_bookings = booking_service.get_bookings_by_hotel_date(hotel_id, check_in)
-        self.assertGreaterEqual(len(hotel_date_bookings), 1, "Query Q3 không tìm thấy bản ghi theo hotel_id và check_in_date")
-        found_in_q3 = any(
-            (b["booking_id"] if isinstance(b, dict) else getattr(b, "booking_id", None)) == booking_id
-            for b in hotel_date_bookings
-        )
-        self.assertTrue(found_in_q3, f"Mã booking {booking_id} không xuất hiện trong bảng bookings_by_hotel_date")
+            # 3. Kiểm tra Query Q3 (bookings_by_hotel_date)
+            hotel_date_bookings = booking_service.get_bookings_by_hotel_date(hotel_id, check_in)
+            self.assertGreaterEqual(len(hotel_date_bookings), 1, "Query Q3 không tìm thấy bản ghi theo hotel_id và check_in_date")
+            found_in_q3 = any(
+                (b["booking_id"] if isinstance(b, dict) else getattr(b, "booking_id", None)) == booking_id
+                for b in hotel_date_bookings
+            )
+            self.assertTrue(found_in_q3, f"Mã booking {booking_id} không xuất hiện trong bảng bookings_by_hotel_date")
 
-        print(f"🎉 TÍCH HỢP ASTRADB THÀNH CÔNG: Booking {booking_id} đã được lưu và đọc chính xác từ cả 2 bảng (Q2 & Q3)!")
+            print(f"🎉 TÍCH HỢP ASTRADB THÀNH CÔNG: Booking {booking_id} đã được lưu và đọc chính xác từ cả 2 bảng (Q2 & Q3)!")
+        finally:
+            if booking_id and self.session:
+                try:
+                    self.session.execute("DELETE FROM bookings_by_guest WHERE guest_id = %s AND booking_id = %s", (guest_id, booking_id))
+                    self.session.execute("DELETE FROM bookings_by_hotel_date WHERE hotel_id = %s AND check_in_date = %s AND booking_id = %s", (hotel_id, check_in, booking_id))
+                except Exception:
+                    pass
 
     def test_create_and_get_invoice_q4(self):
         """
@@ -91,35 +100,42 @@ class BookingServiceAstraIntegrationTest(unittest.TestCase):
         payment_status = "PAID"
         total_amount = 4200000
 
-        # 1. Gọi create_invoice ghi vào AstraDB
-        created_invoice_id = booking_service.create_invoice(
-            booking_id=booking_id,
-            invoice_id=invoice_id,
-            guest_name=guest_name,
-            hotel_id=hotel_id,
-            issue_date=issue_date,
-            payment_method=payment_method,
-            payment_status=payment_status,
-            total_amount=total_amount,
-        )
-        self.assertEqual(created_invoice_id, invoice_id, "create_invoice không trả về đúng invoice_id")
+        try:
+            # 1. Gọi create_invoice ghi vào AstraDB
+            created_invoice_id = booking_service.create_invoice(
+                booking_id=booking_id,
+                invoice_id=invoice_id,
+                guest_name=guest_name,
+                hotel_id=hotel_id,
+                issue_date=issue_date,
+                payment_method=payment_method,
+                payment_status=payment_status,
+                total_amount=total_amount,
+            )
+            self.assertEqual(created_invoice_id, invoice_id, "create_invoice không trả về đúng invoice_id")
 
-        # 2. Truy vấn Q4 bằng get_invoice_by_booking
-        invoice = booking_service.get_invoice_by_booking(booking_id)
-        self.assertIsNotNone(invoice, "Không tìm thấy hóa đơn theo booking_id trên AstraDB")
+            # 2. Truy vấn Q4 bằng get_invoice_by_booking
+            invoice = booking_service.get_invoice_by_booking(booking_id)
+            self.assertIsNotNone(invoice, "Không tìm thấy hóa đơn theo booking_id trên AstraDB")
 
-        # Hỗ trợ cả Row object lẫn dict
-        get_val = lambda key: invoice[key] if isinstance(invoice, dict) else getattr(invoice, key, None)
+            # Hỗ trợ cả Row object lẫn dict
+            get_val = lambda key: invoice[key] if isinstance(invoice, dict) else getattr(invoice, key, None)
 
-        self.assertEqual(get_val("booking_id"), booking_id)
-        self.assertEqual(get_val("invoice_id"), invoice_id)
-        self.assertEqual(get_val("guest_name"), guest_name)
-        self.assertEqual(get_val("hotel_id"), hotel_id)
-        self.assertEqual(get_val("payment_method"), payment_method)
-        self.assertEqual(get_val("payment_status"), payment_status)
-        self.assertEqual(float(get_val("total_amount")), float(total_amount))
+            self.assertEqual(get_val("booking_id"), booking_id)
+            self.assertEqual(get_val("invoice_id"), invoice_id)
+            self.assertEqual(get_val("guest_name"), guest_name)
+            self.assertEqual(get_val("hotel_id"), hotel_id)
+            self.assertEqual(get_val("payment_method"), payment_method)
+            self.assertEqual(get_val("payment_status"), payment_status)
+            self.assertEqual(float(get_val("total_amount")), float(total_amount))
 
-        print(f"🎉 TÍCH HỢP ASTRADB THÀNH CÔNG: Hóa đơn {invoice_id} cho Booking {booking_id} được lưu và đọc chính xác (Query Q4)!")
+            print(f"🎉 TÍCH HỢP ASTRADB THÀNH CÔNG: Hóa đơn {invoice_id} cho Booking {booking_id} được lưu và đọc chính xác (Query Q4)!")
+        finally:
+            if booking_id and self.session:
+                try:
+                    self.session.execute("DELETE FROM invoices_by_booking WHERE booking_id = %s", (booking_id,))
+                except Exception:
+                    pass
 
 
 if __name__ == "__main__":

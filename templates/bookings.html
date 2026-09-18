@@ -1,51 +1,690 @@
 {% extends "base.html" %}
 
-{% block title %}Quản lý Đặt phòng & Hóa đơn - QLKS NoSQL{% endblock %}
+{% block title %}Quản lý Đặt phòng & Hóa đơn - Mường Thanh Hospitality{% endblock %}
 
 {% block content %}
-<section aria-labelledby="bookings-heading" class="space-y-6">
+<section aria-labelledby="bookings-heading" class="w-full space-y-6">
+
     <!-- TIÊU ĐỀ TRANG -->
-    <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-            <h1 id="bookings-heading" class="flex items-center gap-3 text-2xl sm:text-3xl font-bold text-slate-950">
-                <span class="flex h-11 w-11 items-center justify-center rounded-xl bg-amber-100 text-amber-700" aria-hidden="true">
-                    <i class="bi bi-calendar-check"></i>
-                </span>
-                Quản lý Đặt phòng & Hóa đơn
-            </h1>
-            <p class="mt-2 text-sm sm:text-base text-slate-600">
-                Ghi đồng thời 2 bảng (<span class="font-semibold text-amber-700">Atomic BATCH Q5</span>), tra cứu lịch sử (<span class="font-medium text-slate-800">Q2 & Q3</span>) và xuất hóa đơn (<span class="font-medium text-slate-800">Q4</span>).
-            </p>
-        </div>
-        <div class="inline-flex w-fit items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm">
-            <span class="h-2.5 w-2.5 rounded-full {% if bookings %}bg-emerald-500{% else %}bg-amber-500{% endif %}" aria-hidden="true"></span>
-            {{ bookings|length }} kết quả đặt phòng
-        </div>
+    <div class="border-b border-slate-200/80 pb-5">
+        <h1 id="bookings-heading" class="text-2xl sm:text-3xl font-extrabold text-slate-950 tracking-tight">
+            Đặt phòng
+        </h1>
+        <p class="mt-1 text-sm sm:text-base text-slate-600">
+            Tìm kiếm phòng trống theo tiện nghi và tạo đơn lưu trú nhanh tại các chi nhánh Mường Thanh.
+        </p>
     </div>
 
-    <!-- BỐ CỤC CHÍNH: 2 CỘT (FORM BATCH Q5 & KHU VỰC TRA CỨU Q2, Q3, Q4) -->
-    <div class="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,390px)_minmax(0,1fr)] lg:items-start">
-        
-        <!-- CỘT TRÁI: FORM ĐẶT PHÒNG MỚI (BATCH INSERT Q5) -->
-        <aside id="booking-form" class="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-sm lg:sticky lg:top-24">
-            <div class="mb-5 border-b border-slate-100 pb-4">
-                <div class="flex items-center justify-between">
-                    <h2 class="text-lg font-bold text-slate-950 flex items-center gap-2">
-                        <i class="bi bi-lightning-charge-fill text-amber-600"></i> Đặt phòng mới
+    {% if tab == 'rooms' %}
+        <!-- ============================================================== -->
+        <!-- CHẾ ĐỘ 1: KHÁM PHÁ & ĐẶT PHÒNG TRỐNG (ROOM DISCOVERY)          -->
+        <!-- ============================================================== -->
+
+        <!-- BỘ LỌC TÌM PHÒNG CHUẨN NGHIỆP VỤ KHÁCH SẠN -->
+        <div class="rounded-3xl border border-slate-200 bg-white p-5 sm:p-7 shadow-xs">
+            <div class="mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                <div>
+                    <h2 class="text-base font-bold text-slate-950">
+                        Bộ lọc tìm kiếm phòng phù hợp
                     </h2>
-                    <span class="px-2 py-0.5 text-xs font-semibold rounded bg-amber-100 text-amber-800">Batch Q5</span>
+                    <p class="text-xs text-slate-500 mt-0.5">
+                        Lọc theo Chi nhánh, Loại phòng, Loại giường, Sức chứa và Tiện nghi mong muốn của khách hàng.
+                    </p>
                 </div>
-                <p class="mt-1 text-xs text-slate-500">
-                    Ghi đồng thời vào <code class="text-amber-800">bookings_by_guest</code> và <code class="text-amber-800">bookings_by_hotel_date</code>.
+                <div class="text-xs font-semibold text-slate-600 bg-slate-100 px-3 py-1 rounded-lg w-fit">
+                    Tìm thấy <strong class="text-amber-900">{{ filtered_rooms|length }}</strong> phòng phù hợp
+                </div>
+            </div>
+
+            <form action="{{ url_for('booking.list_bookings') }}" method="get" class="space-y-4">
+                <input type="hidden" name="tab" value="rooms">
+
+                <!-- HÀNG 1: CHI NHÁNH, LOẠI PHÒNG, GIƯỜNG, SỨC CHỨA -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <!-- Chi nhánh khách sạn -->
+                    <div>
+                        <label for="filter-hotel" class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
+                            Chi nhánh khách sạn
+                        </label>
+                        <select id="filter-hotel" name="hotel_id" class="min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-sm text-slate-900 outline-none transition focus-visible:border-amber-600 focus-visible:ring-2 focus-visible:ring-amber-200">
+                            <option value="">-- Tất cả các chi nhánh --</option>
+                            {% for h in hotels %}
+                                {% set hid = h.hotel_id if h.hotel_id is defined else h['hotel_id'] %}
+                                {% set hname = h.name if h.name is defined else h['name'] %}
+                                <option value="{{ hid }}" {% if hotel_id == hid %}selected{% endif %}>{{ hname }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Loại phòng -->
+                    <div>
+                        <label for="filter-room-type" class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
+                            Loại phòng
+                        </label>
+                        <select id="filter-room-type" name="room_type" class="min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-sm text-slate-900 outline-none transition focus-visible:border-amber-600 focus-visible:ring-2 focus-visible:ring-amber-200">
+                            <option value="ALL">-- Tất cả loại phòng --</option>
+                            {% for rt in room_types %}
+                                <option value="{{ rt }}" {% if room_type == rt %}selected{% endif %}>{{ rt }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Loại giường -->
+                    <div>
+                        <label for="filter-bed-type" class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
+                            Loại giường
+                        </label>
+                        <select id="filter-bed-type" name="bed_type" class="min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-sm text-slate-900 outline-none transition focus-visible:border-amber-600 focus-visible:ring-2 focus-visible:ring-amber-200">
+                            <option value="ALL">-- Tất cả loại giường --</option>
+                            {% for bt in bed_types %}
+                                <option value="{{ bt }}" {% if bed_type == bt %}selected{% endif %}>Giường {{ bt }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Sức chứa khách -->
+                    <div>
+                        <label for="filter-capacity" class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
+                            Sức chứa tối thiểu
+                        </label>
+                        <select id="filter-capacity" name="capacity" class="min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-sm text-slate-900 outline-none transition focus-visible:border-amber-600 focus-visible:ring-2 focus-visible:ring-amber-200">
+                            <option value="ALL">-- Tất cả sức chứa --</option>
+                            {% for cval, clabel in capacities %}
+                                <option value="{{ cval }}" {% if capacity == cval %}selected{% endif %}>{{ clabel }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <!-- HÀNG 2: TIỆN NGHI, KHOẢNG GIÁ, TRẠNG THÁI & NÚT TÌM KIẾM -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+                    <!-- Tiện nghi mong muốn: Dropdown sổ ra các tiện nghi chuẩn hóa -->
+                    <div>
+                        <label for="filter-amenity" class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
+                            Tiện nghi / Yêu cầu
+                        </label>
+                        <select id="filter-amenity" name="amenity" class="min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-sm text-slate-900 outline-none transition focus-visible:border-amber-600 focus-visible:ring-2 focus-visible:ring-amber-200">
+                            <option value="">-- Tất cả tiện nghi & dịch vụ --</option>
+                            {% if amenity_groups %}
+                                {% for grp in amenity_groups %}
+                                    <optgroup label="{{ grp.group }}">
+                                        {% for val, label in grp.options %}
+                                            <option value="{{ val }}" {% if amenity == val %}selected{% endif %}>{{ label }}</option>
+                                        {% endfor %}
+                                    </optgroup>
+                                {% endfor %}
+                            {% endif %}
+                        </select>
+                    </div>
+
+                    <!-- Khoảng giá / đêm -->
+                    <div>
+                        <label for="filter-price-range" class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
+                            Mức giá / đêm
+                        </label>
+                        <select id="filter-price-range" name="price_range" class="min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-sm text-slate-900 outline-none transition focus-visible:border-amber-600 focus-visible:ring-2 focus-visible:ring-amber-200">
+                            <option value="ALL">-- Tất cả mức giá --</option>
+                            {% for pval, plabel in price_ranges %}
+                                <option value="{{ pval }}" {% if price_range == pval %}selected{% endif %}>{{ plabel }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Trạng thái phòng -->
+                    <div>
+                        <label for="filter-room-status" class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
+                            Tình trạng phòng
+                        </label>
+                        <select id="filter-room-status" name="room_status" class="min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-sm text-slate-900 outline-none transition focus-visible:border-amber-600 focus-visible:ring-2 focus-visible:ring-amber-200">
+                            <option value="AVAILABLE" {% if room_status == 'AVAILABLE' %}selected{% endif %}>Chỉ phòng trống (Sẵn sàng đặt)</option>
+                            <option value="ALL" {% if room_status == 'ALL' %}selected{% endif %}>Tất cả các phòng</option>
+                            <option value="OCCUPIED" {% if room_status == 'OCCUPIED' %}selected{% endif %}>Phòng đang cho thuê</option>
+                            <option value="MAINTENANCE" {% if room_status == 'MAINTENANCE' %}selected{% endif %}>Phòng đang bảo trì</option>
+                        </select>
+                    </div>
+
+                    <!-- Nút Lọc & Đặt lại -->
+                    <div class="flex items-center gap-2">
+                        <button type="submit" class="inline-flex min-h-11 flex-1 cursor-pointer items-center justify-center rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800">
+                            Tìm phòng phù hợp
+                        </button>
+                        {% if is_filtered %}
+                            <a href="{{ url_for('booking.list_bookings', tab='rooms') }}" class="inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-300 bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 transition" title="Xóa bộ lọc">
+                                Đặt lại
+                            </a>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- HÀNG TIỆN NGHI CHỌN NHANH (QUICK CHIPS) -->
+                <div class="pt-3 border-t border-slate-100 flex flex-wrap items-center gap-2">
+                    <span class="text-xs font-semibold text-slate-500">Gợi ý chọn nhanh:</span>
+                    {% if quick_amenities %}
+                        {% for qk_val, qk_label in quick_amenities %}
+                            {% set is_active = (amenity == qk_val) %}
+                            <button type="button" onclick="selectQuickAmenity('{{ qk_val }}')" class="rounded-lg border px-3 py-1 text-xs font-medium transition cursor-pointer {% if is_active %}border-amber-600 bg-amber-50 text-amber-900 font-bold shadow-2xs ring-1 ring-amber-300{% else %}border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 hover:border-slate-300{% endif %}">
+                                {{ qk_label }}
+                            </button>
+                        {% endfor %}
+                    {% endif %}
+                    {% if amenity %}
+                        <button type="button" onclick="selectQuickAmenity('')" class="text-xs text-rose-600 hover:underline font-medium ml-2 cursor-pointer">
+                            Xóa chọn tiện nghi
+                        </button>
+                    {% endif %}
+                </div>
+            </form>
+        </div>
+
+        <!-- LƯỚI DANH SÁCH CÁC PHÒNG KHẢ DỤNG (RỘNG RÃI, THOÁNG ĐÃNG) -->
+        {% if filtered_rooms %}
+            <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-6">
+                {% for r in filtered_rooms %}
+                    <div class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm hover:shadow-md transition flex flex-col justify-between space-y-4">
+                        <div>
+                            <!-- HEADER THẺ: SỐ PHÒNG & TRẠNG THÁI -->
+                            <div class="flex items-start justify-between gap-3 border-b border-slate-100 pb-3.5">
+                                <div>
+                                    <div class="flex items-center gap-2.5">
+                                        <span class="text-xl sm:text-2xl font-black text-slate-950 tracking-tight">
+                                            Phòng {{ r.room_number }}
+                                        </span>
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-lg text-xs font-bold uppercase tracking-wider bg-slate-100 text-slate-800">
+                                            {{ r.room_type }}
+                                        </span>
+                                    </div>
+                                    <p class="text-xs font-medium text-slate-500 mt-1">
+                                        {{ r.hotel_name }}
+                                    </p>
+                                </div>
+
+                                <!-- BADGE TRẠNG THÁI -->
+                                {% if r.status == 'AVAILABLE' %}
+                                    <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                                        <span class="h-2 w-2 rounded-full bg-emerald-500"></span>
+                                        Đang trống
+                                    </span>
+                                {% elif r.status == 'OCCUPIED' %}
+                                    <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-900 border border-amber-200">
+                                        <span class="h-2 w-2 rounded-full bg-amber-500"></span>
+                                        Đang thuê
+                                    </span>
+                                {% else %}
+                                    <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-red-50 text-red-800 border border-red-200">
+                                        <span class="h-2 w-2 rounded-full bg-red-500"></span>
+                                        Bảo trì
+                                    </span>
+                                {% endif %}
+                            </div>
+
+                            <!-- THÔNG SỐ: GIƯỜNG & SỨC CHỨA -->
+                            <div class="mt-4 grid grid-cols-2 gap-3 bg-slate-50/80 rounded-2xl p-3 text-xs">
+                                <div>
+                                    <span class="text-slate-400 font-semibold uppercase block">Sức chứa</span>
+                                    <strong class="text-slate-900 text-sm font-bold">{{ r.capacity }} người lớn</strong>
+                                </div>
+                                <div>
+                                    <span class="text-slate-400 font-semibold uppercase block">Loại giường</span>
+                                    <strong class="text-slate-900 text-sm font-bold">Giường {{ r.bed_type }}</strong>
+                                </div>
+                            </div>
+
+                            <!-- MÔ TẢ & TIỆN NGHI -->
+                            <div class="mt-4">
+                                <p class="text-xs text-slate-600 leading-relaxed line-clamp-3">
+                                    {{ r.description or 'Phòng tiêu chuẩn Mường Thanh Hospitality với đầy đủ trang thiết bị cao cấp.' }}
+                                </p>
+                            </div>
+                        </div>
+
+                        <!-- FOOTER THẺ: GIÁ TIỀN & NÚT HÀNH ĐỘNG -->
+                        <div class="pt-4 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3">
+                            <div>
+                                <span class="text-[11px] font-semibold text-slate-400 uppercase block">Giá niêm yết</span>
+                                <span class="font-mono text-lg sm:text-xl font-extrabold text-amber-900">
+                                    {{ "{:,.0f}".format(r.price_per_night) }} đ
+                                </span>
+                                <span class="text-xs text-slate-500 font-normal">/ đêm</span>
+                            </div>
+
+                            <div class="flex items-center gap-2">
+                                <button type="button" 
+                                        onclick="openRoomDetailModal('{{ r.hotel_id }}', '{{ r.room_number }}')"
+                                        class="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 hover:text-slate-900 transition cursor-pointer"
+                                        title="Xem chi tiết tiện nghi & trạng thái phòng {{ r.room_number }}">
+                                    <svg class="h-4 w-4 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                    Chi tiết phòng
+                                </button>
+                                {% if r.status == 'AVAILABLE' %}
+                                    <button type="button" 
+                                            onclick="openBookingModalForRoom('{{ r.hotel_id }}', '{{ r.room_number }}', {{ r.price_per_night }})"
+                                            class="inline-flex min-h-10 items-center justify-center gap-1 rounded-xl bg-amber-600 px-4 py-2 text-xs sm:text-sm font-bold text-white shadow-sm hover:bg-amber-700 transition cursor-pointer">
+                                        + Đặt phòng này
+                                    </button>
+                                {% elif r.status == 'OCCUPIED' %}
+                                    <button type="button" 
+                                            onclick="openRoomDetailModal('{{ r.hotel_id }}', '{{ r.room_number }}')"
+                                            class="inline-flex min-h-10 items-center justify-center gap-1 rounded-xl border border-amber-300 bg-amber-50 px-3.5 py-2 text-xs font-bold text-amber-900 hover:bg-amber-100 transition cursor-pointer"
+                                            title="Xem thông tin khách hàng đang lưu trú">
+                                        Đang thuê &rarr;
+                                    </button>
+                                {% else %}
+                                    <button type="button" 
+                                            onclick="openRoomDetailModal('{{ r.hotel_id }}', '{{ r.room_number }}')"
+                                            class="inline-flex min-h-10 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 transition cursor-pointer">
+                                        Bảo trì
+                                    </button>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <!-- EMPTY STATE KHI KHÔNG CÓ PHÒNG PHÙ HỢP -->
+            <div class="rounded-3xl border border-slate-200 bg-white p-12 text-center">
+                <h3 class="font-bold text-slate-900 text-lg">Không tìm thấy phòng nào phù hợp với bộ lọc</h3>
+                <p class="mx-auto mt-2 max-w-md text-sm text-slate-500 leading-relaxed">
+                    Hãy thử nới lỏng các tiêu chí (chọn tất cả loại phòng, loại giường hoặc xóa từ khóa tiện nghi) để tìm thêm phòng trống.
+                </p>
+                <div class="mt-6 flex flex-wrap items-center justify-center gap-3">
+                    <a href="{{ url_for('booking.list_bookings', tab='rooms') }}" class="inline-flex items-center rounded-xl border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 transition">
+                        Xem tất cả phòng trống
+                    </a>
+                </div>
+            </div>
+        {% endif %}
+
+    {% else %}
+        <!-- ============================================================== -->
+        <!-- CHẾ ĐỘ 2: QUẢN LÝ DANH SÁCH ĐƠN ĐÃ ĐẶT (BOOKINGS TABLE)         -->
+        <!-- ============================================================== -->
+
+        <!-- BỘ LỌC TÌM KIẾM ĐƠN ĐẶT PHÒNG -->
+        <div class="rounded-3xl border border-slate-200 bg-white p-5 sm:p-7 shadow-xs">
+            <form action="{{ url_for('booking.list_bookings') }}" method="get" class="space-y-3">
+                <input type="hidden" name="tab" value="orders">
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+                    <!-- Lọc theo Chi nhánh -->
+                    <div>
+                        <label for="order-hotel" class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
+                            Chi nhánh khách sạn
+                        </label>
+                        <select id="order-hotel" name="hotel_id" class="min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus-visible:border-amber-600 focus-visible:ring-2 focus-visible:ring-amber-200">
+                            <option value="">-- Tất cả chi nhánh --</option>
+                            {% for h in hotels %}
+                                {% set hid = h.hotel_id if h.hotel_id is defined else h['hotel_id'] %}
+                                {% set hname = h.name if h.name is defined else h['name'] %}
+                                <option value="{{ hid }}" {% if hotel_id == hid %}selected{% endif %}>{{ hname }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Lọc theo Khách hàng -->
+                    <div>
+                        <label for="order-guest" class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
+                            Khách hàng
+                        </label>
+                        <select id="order-guest" name="guest_id" class="min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus-visible:border-amber-600 focus-visible:ring-2 focus-visible:ring-amber-200">
+                            <option value="">-- Tất cả khách hàng --</option>
+                            {% for g in guests %}
+                                {% set gid = g.guest_id if g.guest_id is defined else g['guest_id'] %}
+                                {% set gname = g.full_name if g.full_name is defined else g['full_name'] %}
+                                <option value="{{ gid }}" {% if guest_id == gid %}selected{% endif %}>{{ gname }} ({{ gid }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Lọc theo Ngày nhận phòng -->
+                    <div>
+                        <label for="order-date" class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
+                            Ngày nhận phòng
+                        </label>
+                        <input id="order-date" name="check_in_date" type="date" value="{{ check_in_date or '' }}" class="min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus-visible:border-amber-600 focus-visible:ring-2 focus-visible:ring-amber-200">
+                    </div>
+
+                    <!-- Ô tìm kiếm từ khóa & Nút hành động -->
+                    <div class="flex items-center gap-2">
+                        <div class="flex-1">
+                            <label for="order-q" class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
+                                Tìm kiếm nhanh
+                            </label>
+                            <input id="order-q" name="q" type="text" value="{{ q or '' }}" placeholder="Mã đơn, SĐT, số phòng..." class="min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus-visible:border-amber-600 focus-visible:ring-2 focus-visible:ring-amber-200">
+                        </div>
+                        <div class="pt-6 flex items-center gap-2">
+                            <button type="submit" class="inline-flex min-h-11 cursor-pointer items-center justify-center rounded-xl bg-slate-900 px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800">
+                                Lọc
+                            </button>
+                            {% if is_filtered %}
+                                <a href="{{ url_for('booking.list_bookings', tab='orders') }}" class="inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 transition" title="Xóa bộ lọc">
+                                    Đặt lại
+                                </a>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <!-- BẢNG DANH SÁCH ĐƠN ĐẶT PHÒNG RỘNG RÃI -->
+        <div class="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+            <div class="border-b border-slate-200 px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                    <h2 class="font-bold text-slate-950 text-base">
+                        Danh Sách Đơn Đặt Phòng
+                    </h2>
+                    <p class="mt-0.5 text-xs text-slate-500">
+                        Quản lý chi tiết mã đơn, khách hàng lưu trú, phòng và chứng từ thanh toán.
+                    </p>
+                </div>
+                {% if bookings %}
+                    <div class="text-xs font-semibold text-slate-500 bg-slate-100 px-3.5 py-1.5 rounded-xl w-fit">
+                        {{ bookings|length }} đơn đặt phòng
+                    </div>
+                {% endif %}
+            </div>
+
+            {% if bookings %}
+                <div class="overflow-x-auto">
+                    <table class="w-full min-w-[900px] text-left text-sm">
+                        <thead class="bg-slate-50 text-xs uppercase tracking-wider text-slate-500 font-semibold border-b border-slate-200">
+                            <tr>
+                                <th scope="col" class="px-6 py-4">Mã Đơn</th>
+                                <th scope="col" class="px-6 py-4">Khách Hàng</th>
+                                <th scope="col" class="px-6 py-4">Chi Nhánh / Phòng</th>
+                                <th scope="col" class="px-6 py-4">Thời Gian Lưu Trú</th>
+                                <th scope="col" class="px-6 py-4">Tổng Tiền</th>
+                                <th scope="col" class="px-6 py-4">Trạng Thái</th>
+                                <th scope="col" class="px-6 py-4 text-right">Thao Tác</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            {% for b in bookings %}
+                                {% set b_id = b.booking_id if b.booking_id is defined else b.get('booking_id', '') %}
+                                {% set g_id = b.guest_id if b.guest_id is defined else b.get('guest_id', '') %}
+                                {% set g_name = b.guest_name if b.guest_name is defined else b.get('guest_name', '') %}
+                                {% set g_phone = b.guest_phone if b.guest_phone is defined else b.get('guest_phone', '') %}
+                                {% set h_id = b.hotel_id if b.hotel_id is defined else b.get('hotel_id', '') %}
+                                {% set h_name = b.hotel_name if b.hotel_name is defined else b.get('hotel_name', '') %}
+                                {% set r_num = b.room_number if b.room_number is defined else b.get('room_number', '') %}
+                                {% set in_d = b.check_in_date if b.check_in_date is defined else b.get('check_in_date', '') %}
+                                {% set out_d = b.check_out_date if b.check_out_date is defined else b.get('check_out_date', '') %}
+                                {% set nights = b.nights if b.nights is defined else b.get('nights', 1) %}
+                                {% set status_val = b.status if b.status is defined else b.get('status', 'CONFIRMED') %}
+                                {% set amt = b.total_amount if b.total_amount is defined else b.get('total_amount', 0) %}
+
+                                <tr class="align-middle transition hover:bg-slate-50/70">
+                                    <!-- Mã Booking -->
+                                    <td class="px-6 py-4 font-mono font-bold text-amber-900">
+                                        <span class="inline-flex items-center px-2.5 py-1 rounded-lg bg-amber-100 text-xs font-bold text-amber-950 border border-amber-200">
+                                            {{ b_id }}
+                                        </span>
+                                    </td>
+
+                                    <!-- Khách hàng -->
+                                    <td class="px-6 py-4">
+                                        <p class="font-bold text-slate-950 text-sm">{{ g_name or g_id or 'Khách vãng lai' }}</p>
+                                        <div class="flex items-center gap-2 mt-0.5 text-xs text-slate-500 font-mono">
+                                            {% if g_phone %}<span>{{ g_phone }}</span>{% endif %}
+                                            {% if g_id and g_name %}<span>&bull; {{ g_id }}</span>{% endif %}
+                                        </div>
+                                    </td>
+
+                                    <!-- Khách sạn / Phòng -->
+                                    <td class="px-6 py-4 text-slate-700">
+                                        <p class="font-semibold text-slate-900">{{ h_name or h_id }}</p>
+                                        <p class="text-xs text-slate-500 mt-0.5">
+                                            Số phòng: <strong class="text-slate-800 font-semibold">{{ r_num }}</strong>
+                                        </p>
+                                    </td>
+
+                                    <!-- Thời gian lưu trú -->
+                                    <td class="px-6 py-4 text-xs text-slate-600">
+                                        <div class="font-medium text-slate-900 text-sm">
+                                            {{ in_d }} &rarr; {{ out_d or '—' }}
+                                        </div>
+                                        <p class="text-slate-400 mt-0.5">{{ nights }} đêm lưu trú</p>
+                                    </td>
+
+                                    <!-- Tổng tiền -->
+                                    <td class="px-6 py-4 font-mono font-bold text-slate-900 text-sm">
+                                        {% if amt %}
+                                            {{ "{:,.0f}".format(amt|float) }} đ
+                                        {% else %}
+                                            0 đ
+                                        {% endif %}
+                                    </td>
+
+                                    <!-- Trạng thái -->
+                                    <td class="px-6 py-4">
+                                        {% if status_val == 'CONFIRMED' %}
+                                            <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                                Đã xác nhận
+                                            </span>
+                                        {% elif status_val in ('CHECKED_IN', 'OCCUPIED') %}
+                                            <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-900 border border-amber-200">
+                                                Đang ở
+                                            </span>
+                                        {% elif status_val == 'COMPLETED' %}
+                                            <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+                                                Đã trả phòng
+                                            </span>
+                                        {% else %}
+                                            <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800 border border-blue-200">
+                                                {{ status_val }}
+                                            </span>
+                                        {% endif %}
+                                    </td>
+
+                                    <!-- Nút hành động -->
+                                    <td class="px-6 py-4 text-right">
+                                        <div class="inline-flex items-center gap-2 justify-end">
+                                            <a href="{{ url_for('booking.view_invoice', booking_id=b_id) }}" class="inline-flex min-h-9 items-center rounded-xl border border-amber-300 bg-amber-50 px-3 py-1 text-xs font-bold text-amber-900 shadow-2xs transition hover:bg-amber-100 hover:border-amber-400">
+                                                Xem hóa đơn
+                                            </a>
+                                            {% if h_id and r_num %}
+                                                <a href="/hotels/{{ h_id }}/rooms/{{ r_num }}" class="inline-flex min-h-9 items-center rounded-xl border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 shadow-2xs transition hover:bg-slate-50" title="Chi tiết phòng">
+                                                    Phòng
+                                                </a>
+                                            {% endif %}
+                                            {% if status_val in ('CONFIRMED', 'CHECKED_IN', 'OCCUPIED') %}
+                                                <form method="post" action="{{ url_for('booking.checkout_booking', booking_id=b_id) }}" class="inline"
+                                                      onsubmit="return confirm('Trả phòng cho đơn {{ b_id }}?\n\nĐơn sẽ chuyển sang Đã trả phòng và phòng {{ r_num }} về Đang trống.\n\nTrả sớm không được giảm hay hoàn tiền: hóa đơn giữ nguyên {{ nights }} đêm đã đặt.');">
+                                                    <input type="hidden" name="guest_id" value="{{ g_id }}">
+                                                    <input type="hidden" name="hotel_id" value="{{ h_id }}">
+                                                    <input type="hidden" name="room_number" value="{{ r_num }}">
+                                                    <input type="hidden" name="check_in_date" value="{{ in_d }}">
+                                                    <input type="hidden" name="check_out_date" value="{{ out_d }}">
+                                                    <button type="submit" class="inline-flex min-h-9 items-center rounded-xl border border-emerald-300 bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-900 shadow-2xs transition hover:bg-emerald-100 hover:border-emerald-400 cursor-pointer" title="Đóng đơn và giải phóng phòng">
+                                                        Trả phòng
+                                                    </button>
+                                                </form>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="px-6 py-14 text-center">
+                    <h3 class="font-bold text-slate-900 text-base">Không tìm thấy đơn đặt phòng nào</h3>
+                    <p class="mx-auto mt-1.5 max-w-md text-sm text-slate-500">
+                        Chưa có đơn đặt phòng nào khớp với bộ lọc tra cứu.
+                    </p>
+                </div>
+            {% endif %}
+        </div>
+    {% endif %}
+
+<!-- ==================================================================== -->
+<!-- POPUP MODAL: CHI TIẾT PHÒNG NHANH                                    -->
+<!-- ==================================================================== -->
+<div id="room-detail-modal" class="fixed inset-0 z-50 overflow-y-auto bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4 sm:p-6 hidden" role="dialog" aria-modal="true" aria-labelledby="modal-room-title">
+    <div class="w-full max-w-2xl rounded-3xl bg-white shadow-2xl border border-slate-200 overflow-hidden transform transition-all my-8 flex flex-col">
+        
+        <!-- MODAL HEADER -->
+        <div class="flex items-center justify-between border-b border-slate-100 bg-slate-50/90 px-6 sm:px-7 py-4">
+            <div class="flex items-center gap-3">
+                <div>
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <h2 id="modal-room-title" class="text-xl font-bold text-slate-950">
+                            Phòng <span id="rd-room-number">...</span>
+                        </h2>
+                        <span id="rd-room-type-badge" class="inline-flex items-center px-2.5 py-0.5 rounded-lg text-xs font-bold uppercase tracking-wider bg-slate-100 text-slate-800">
+                            ...
+                        </span>
+                        <span id="rd-status-badge"></span>
+                    </div>
+                    <p id="rd-hotel-name" class="text-xs text-slate-500 mt-0.5 font-medium">
+                        ...
+                    </p>
+                </div>
+            </div>
+            <button type="button" onclick="closeRoomDetailModal()" class="inline-flex h-9 w-9 items-center justify-center rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition cursor-pointer" aria-label="Đóng popup">
+                <span class="text-xl font-bold">&times;</span>
+            </button>
+        </div>
+
+        <!-- MODAL BODY -->
+        <div class="p-6 sm:p-7 space-y-5 max-h-[70vh] overflow-y-auto">
+            
+            <!-- THÔNG SỐ CỐT LÕI (4 Ô GRID) -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-50 rounded-2xl p-4 border border-slate-100">
+                <div>
+                    <span class="text-[11px] font-semibold text-slate-400 uppercase block">Giá niêm yết</span>
+                    <strong id="rd-price" class="text-base font-extrabold text-amber-900 font-mono">0 đ</strong>
+                    <span class="text-[11px] text-slate-400 block">/ đêm</span>
+                </div>
+                <div>
+                    <span class="text-[11px] font-semibold text-slate-400 uppercase block">Sức chứa</span>
+                    <strong id="rd-capacity" class="text-sm font-bold text-slate-800">2 người</strong>
+                </div>
+                <div>
+                    <span class="text-[11px] font-semibold text-slate-400 uppercase block">Loại giường</span>
+                    <strong id="rd-bed" class="text-sm font-bold text-slate-800">Giường King</strong>
+                </div>
+                <div>
+                    <span class="text-[11px] font-semibold text-slate-400 uppercase block">Mã phòng</span>
+                    <strong id="rd-code" class="text-xs font-mono font-bold text-slate-700 block mt-0.5">...</strong>
+                </div>
+            </div>
+
+            <!-- MÔ TẢ PHÒNG -->
+            <div>
+                <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">Mô tả phòng</h3>
+                <p id="rd-description" class="text-sm text-slate-700 leading-relaxed bg-white rounded-xl p-3.5 border border-slate-200">
+                    ...
                 </p>
             </div>
 
-            <form action="{{ url_for('booking.create_booking') }}" method="post" class="space-y-4" id="form-create-booking">
-                <!-- Chọn khách hàng -->
-                <div>
-                    <label for="select-guest" class="block text-sm font-medium text-slate-700">Khách hàng <span class="text-red-600" aria-hidden="true">*</span></label>
-                    <select id="select-guest" name="guest_id" required class="mt-1.5 min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-slate-900 outline-none transition focus-visible:border-amber-600 focus-visible:ring-2 focus-visible:ring-amber-200" onchange="onGuestChange(this)">
-                        <option value="">-- Chọn khách hàng đã có --</option>
+            <!-- TIỆN NGHI PHÒNG -->
+            <div>
+                <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Trang thiết bị & Tiện nghi phòng</h3>
+                <div id="rd-room-features" class="flex flex-wrap gap-2"></div>
+            </div>
+
+            <!-- TIỆN ÍCH CHI NHÁNH (TỪ KHÁCH SẠN) -->
+            <div>
+                <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Tiện ích chi nhánh khách sạn sở hữu</h3>
+                <div id="rd-hotel-amenities" class="flex flex-wrap gap-2"></div>
+            </div>
+
+            <!-- KHỐI THÔNG TIN KHÁCH ĐANG THUÊ (HIỆN KHI OCCUPIED) -->
+            <div id="rd-active-booking-section" class="hidden rounded-2xl border border-amber-200 bg-amber-50/60 p-5 space-y-3.5">
+                <div class="flex items-center justify-between border-b border-amber-200/80 pb-2.5">
+                    <div class="flex items-center gap-2">
+                        <span class="h-2.5 w-2.5 rounded-full bg-amber-500 animate-pulse"></span>
+                        <h4 class="text-xs font-bold uppercase tracking-wider text-amber-950">Khách Hàng Đang Lưu Trú</h4>
+                    </div>
+                    <span id="rd-ab-id" class="font-mono text-xs font-bold text-amber-900 bg-amber-200/70 px-2.5 py-0.5 rounded-md">#...</span>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5 text-xs">
+                    <div>
+                        <span class="text-slate-500 uppercase block font-semibold">Khách hàng</span>
+                        <strong id="rd-ab-guest-name" class="text-sm font-bold text-slate-900 block mt-0.5">...</strong>
+                        <span id="rd-ab-guest-phone" class="text-slate-600 block mt-0.5">SĐT: ...</span>
+                        <span id="rd-ab-guest-card" class="text-slate-500 block font-mono">CCCD: ...</span>
+                    </div>
+                    <div>
+                        <span class="text-slate-500 uppercase block font-semibold">Thời gian lưu trú</span>
+                        <strong id="rd-ab-dates" class="text-xs font-bold text-slate-900 block mt-0.5">... &rarr; ...</strong>
+                        <span id="rd-ab-nights" class="text-amber-900 font-semibold block mt-0.5">... đêm</span>
+                        <span id="rd-ab-amount" class="text-xs font-mono font-bold text-slate-800 block mt-0.5">Tổng tiền: ...</span>
+                    </div>
+                </div>
+                <!-- TIẾN ĐỘ THANH TOÁN CỦA KHÁCH -->
+                <div class="pt-2.5 border-t border-amber-200/60 space-y-2">
+                    <div class="flex items-center justify-between text-xs">
+                        <span class="text-slate-600 font-semibold">Trạng thái thanh toán:</span>
+                        <span id="rd-ab-payment-badge" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold">...</span>
+                    </div>
+                    <div id="rd-ab-deposit-detail" class="hidden text-xs p-2.5 rounded-xl bg-white border border-amber-200 text-slate-700">
+                        <!-- Chi tiết cọc & còn thiếu -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- LOADING INDICATOR CHO ASYNC DATA -->
+            <div id="rd-loading" class="hidden text-center py-2 text-xs text-slate-400">
+                <span class="inline-block animate-spin mr-1.5">⏳</span> Đang đồng bộ thông tin tiện ích và tình trạng phòng...
+            </div>
+        </div>
+
+        <!-- MODAL FOOTER -->
+        <div class="border-t border-slate-100 bg-slate-50/80 px-6 sm:px-7 py-4 flex items-center justify-between gap-3">
+            <button type="button" onclick="closeRoomDetailModal()" class="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 transition cursor-pointer">
+                Đóng
+            </button>
+            <div id="rd-modal-actions"></div>
+        </div>
+    </div>
+</div>
+
+<!-- ==================================================================== -->
+<!-- POPUP MODAL: ĐẶT PHÒNG MỚI                                           -->
+<!-- ==================================================================== -->
+<div id="booking-modal" class="fixed inset-0 z-50 overflow-y-auto bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4 sm:p-6 hidden" role="dialog" aria-modal="true" aria-labelledby="modal-booking-title">
+    <div class="w-full max-w-2xl rounded-3xl bg-white shadow-2xl border border-slate-200 overflow-hidden transform transition-all my-8">
+        
+        <!-- MODAL HEADER -->
+        <div class="flex items-center justify-between border-b border-slate-100 bg-slate-50/80 px-7 py-4.5">
+            <div>
+                <h2 id="modal-booking-title" class="text-xl font-bold text-slate-950">
+                    Đặt phòng mới
+                </h2>
+                <p class="text-xs text-slate-500 mt-0.5">
+                    Điền thông tin khách hàng và hoàn tất đơn lưu trú
+                </p>
+            </div>
+            <button type="button" onclick="closeBookingModal()" class="inline-flex h-9 w-9 items-center justify-center rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition cursor-pointer" aria-label="Đóng popup">
+                <span class="text-xl font-bold">&times;</span>
+            </button>
+        </div>
+
+        <!-- MODAL BODY: FORM TẠO ĐƠN -->
+        <form action="{{ url_for('booking.create_booking') }}" method="post" id="form-create-booking" class="p-7 space-y-4">
+            
+            <!-- KHỐI THÔNG TIN KHÁCH HÀNG (CHỌN KHÁCH CÓ SẴN HOẶC TẠO KHÁCH MỚI) -->
+            <div class="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 space-y-3">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-bold uppercase tracking-wider text-slate-700">
+                        Khách hàng <span class="text-red-600">*</span>
+                    </span>
+                    <div class="inline-flex rounded-lg bg-slate-200/80 p-0.5 text-xs font-semibold">
+                        <button type="button" id="tab-guest-existing" onclick="setGuestMode('existing')" class="px-2.5 py-1 rounded-md bg-white text-slate-900 shadow-sm transition">Khách có sẵn</button>
+                        <button type="button" id="tab-guest-new" onclick="setGuestMode('new')" class="px-2.5 py-1 rounded-md text-slate-600 hover:text-slate-900 transition">+ Khách mới</button>
+                    </div>
+                </div>
+
+                <!-- Dropdown khách có sẵn -->
+                <div id="section-existing-guest">
+                    <select id="select-guest" name="guest_id" class="min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-sm text-slate-900 outline-none transition focus-visible:border-amber-600 focus-visible:ring-2 focus-visible:ring-amber-200" onchange="onGuestChange(this)">
+                        <option value="">-- Chọn khách hàng đã có trong danh bạ --</option>
+                        <option value="NEW" class="font-bold text-amber-800">+ Khách hàng mới (Tạo nhanh tại quầy)...</option>
                         {% for g in guests %}
                             {% set gid = g.guest_id if g.guest_id is defined else g['guest_id'] %}
                             {% set gname = g.full_name if g.full_name is defined else g['full_name'] %}
@@ -54,305 +693,727 @@
                     </select>
                 </div>
 
-                <!-- Tên khách hàng (ẩn hoặc chỉnh sửa) -->
+                <!-- Họ và tên khách -->
                 <div>
-                    <label for="guest-name" class="block text-sm font-medium text-slate-700">Họ và tên khách</label>
-                    <input id="guest-name" name="guest_name" type="text" placeholder="Tự động điền theo khách hàng" class="mt-1.5 min-h-11 w-full rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5 text-slate-900 outline-none transition focus-visible:border-amber-600 focus-visible:ring-2 focus-visible:ring-amber-200">
+                    <label for="guest-name" class="block text-xs font-medium text-slate-600 mb-1">
+                        Họ và tên khách <span class="text-red-600">*</span>
+                    </label>
+                    <input id="guest-name" name="guest_name" type="text" placeholder="Ví dụ: Nguyễn Anh Quân" class="min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-sm text-slate-900 outline-none transition focus-visible:border-amber-600 focus-visible:ring-2 focus-visible:ring-amber-200">
                 </div>
 
+                <!-- Bổ sung số điện thoại & CCCD cho khách mới -->
+                <div id="section-new-guest-extra" class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-0.5">
+                    <div>
+                        <label for="guest-phone" class="block text-xs font-medium text-slate-600 mb-1">Số điện thoại</label>
+                        <input id="guest-phone" name="guest_phone" type="tel" placeholder="0901234567" class="min-h-10 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus-visible:border-amber-600">
+                    </div>
+                    <div>
+                        <label for="guest-id-card" class="block text-xs font-medium text-slate-600 mb-1">Số CCCD / Hộ chiếu</label>
+                        <input id="guest-id-card" name="guest_id_card" type="text" placeholder="079201001234" class="min-h-10 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus-visible:border-amber-600">
+                    </div>
+                </div>
+                <p id="guest-mode-hint" class="text-[11px] text-slate-500">Khách mới sẽ tự động được cấp mã ID và lưu vào hệ thống khi tạo đơn.</p>
+            </div>
+
+            <!-- CHỌN CHI NHÁNH & SỐ PHÒNG -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 <!-- Chọn khách sạn -->
                 <div>
-                    <label for="select-hotel" class="block text-sm font-medium text-slate-700">Khách sạn <span class="text-red-600" aria-hidden="true">*</span></label>
-                    <select id="select-hotel" name="hotel_id" required class="mt-1.5 min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-slate-900 outline-none transition focus-visible:border-amber-600 focus-visible:ring-2 focus-visible:ring-amber-200">
+                    <label for="select-hotel" class="block text-xs font-semibold text-slate-700 mb-1">
+                        Chi nhánh khách sạn <span class="text-red-600">*</span>
+                    </label>
+                    <select id="select-hotel" name="hotel_id" required class="min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-sm text-slate-900 outline-none transition focus-visible:border-amber-600 focus-visible:ring-2 focus-visible:ring-amber-200">
                         <option value="">-- Chọn khách sạn lưu trú --</option>
                         {% for h in hotels %}
                             {% set hid = h.hotel_id if h.hotel_id is defined else h['hotel_id'] %}
                             {% set hname = h.name if h.name is defined else h['name'] %}
-                            <option value="{{ hid }}">{{ hname }} ({{ hid }})</option>
+                            <option value="{{ hid }}" {% if hotel_id == hid or loop.first %}selected{% endif %}>{{ hname }}</option>
                         {% endfor %}
                     </select>
                 </div>
 
-                <!-- Số phòng -->
+                <!-- Số phòng (Dropdown động theo khách sạn) -->
                 <div>
-                    <label for="room-number" class="block text-sm font-medium text-slate-700">Số phòng <span class="text-red-600" aria-hidden="true">*</span></label>
-                    <input id="room-number" name="room_number" type="text" required placeholder="Ví dụ: 101, 202, 305" class="mt-1.5 min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-slate-900 outline-none transition focus-visible:border-amber-600 focus-visible:ring-2 focus-visible:ring-amber-200">
-                </div>
-
-                <!-- Ngày Check-in & Check-out -->
-                <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <div>
-                        <label for="check-in-date" class="block text-sm font-medium text-slate-700">Check-in <span class="text-red-600" aria-hidden="true">*</span></label>
-                        <input id="check-in-date" name="check_in_date" type="date" required class="mt-1.5 min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-900 outline-none transition focus-visible:border-amber-600 focus-visible:ring-2 focus-visible:ring-amber-200">
-                    </div>
-                    <div>
-                        <label for="check-out-date" class="block text-sm font-medium text-slate-700">Check-out <span class="text-red-600" aria-hidden="true">*</span></label>
-                        <input id="check-out-date" name="check_out_date" type="date" required class="mt-1.5 min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-900 outline-none transition focus-visible:border-amber-600 focus-visible:ring-2 focus-visible:ring-amber-200">
-                    </div>
-                </div>
-
-                <!-- Tổng tiền & Phương thức thanh toán -->
-                <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <div>
-                        <label for="total-amount" class="block text-sm font-medium text-slate-700">Tổng tiền (VNĐ)</label>
-                        <input id="total-amount" name="total_amount" type="number" step="50000" min="0" value="2500000" required class="mt-1.5 min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-slate-900 outline-none transition focus-visible:border-amber-600 focus-visible:ring-2 focus-visible:ring-amber-200">
-                    </div>
-                    <div>
-                        <label for="payment-method" class="block text-sm font-medium text-slate-700">Thanh toán</label>
-                        <select id="payment-method" name="payment_method" class="mt-1.5 min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-900 outline-none transition focus-visible:border-amber-600 focus-visible:ring-2 focus-visible:ring-amber-200">
-                            <option value="TIỀN MẶT">Tiền mặt</option>
-                            <option value="THẺ TÍN DỤNG">Thẻ tín dụng</option>
-                            <option value="CHUYỂN KHOẢN">Chuyển khoản</option>
-                        </select>
-                    </div>
-                </div>
-
-                <!-- Trạng thái -->
-                <div>
-                    <label for="status" class="block text-sm font-medium text-slate-700">Trạng thái đặt phòng</label>
-                    <select id="status" name="status" class="mt-1.5 min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-900 outline-none transition focus-visible:border-amber-600 focus-visible:ring-2 focus-visible:ring-amber-200">
-                        <option value="CONFIRMED" selected>Đã xác nhận (CONFIRMED)</option>
-                        <option value="CHECKED_IN">Đã nhận phòng (CHECKED_IN)</option>
-                        <option value="PENDING">Chờ xử lý (PENDING)</option>
+                    <label for="room-number" class="block text-xs font-semibold text-slate-700 mb-1">
+                        Số phòng <span class="text-red-600">*</span>
+                    </label>
+                    <select id="room-number" name="room_number" required class="min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-sm text-slate-900 outline-none transition focus-visible:border-amber-600 focus-visible:ring-2 focus-visible:ring-amber-200">
+                        <option value="">-- Vui lòng chọn khách sạn trước --</option>
                     </select>
                 </div>
-
-                <!-- Nút Submit BATCH Q5 -->
-                <button type="submit" class="mt-2 inline-flex min-h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-amber-600 px-4 py-3 font-semibold text-white shadow-md transition hover:bg-amber-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-60">
-                    <i class="bi bi-calendar2-plus" aria-hidden="true"></i>
-                    Đặt phòng (Batch Insert Q5)
-                </button>
-            </form>
-        </aside>
-
-        <!-- CỘT PHẢI: BỘ LỌC TRA CỨU (Q2 & Q3) & DANH SÁCH ĐẶT PHÒNG KÈM XEM HÓA ĐƠN (Q4) -->
-        <div class="space-y-6">
-
-            <!-- BỘ LỌC TRA CỨU ĐA NĂNG -->
-            <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                <div class="mb-4">
-                    <h2 class="text-base font-bold text-slate-900 flex items-center gap-2">
-                        <i class="bi bi-funnel-fill text-amber-600"></i> Bộ Lọc Tra Cứu (NoSQL Query-First)
-                    </h2>
-                    <p class="text-xs text-slate-500 mt-0.5">
-                        Tra cứu theo Partition Key trực tiếp tới node dữ liệu trong Cassandra AstraDB.
-                    </p>
-                </div>
-
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <!-- BỘ LỌC 1: TRA CỨU THEO KHÁCH HÀNG (QUERY Q2) -->
-                    <div class="rounded-xl border border-amber-200/70 bg-amber-50/40 p-4">
-                        <div class="flex items-center justify-between mb-2">
-                            <span class="text-xs font-bold uppercase tracking-wider text-amber-800 flex items-center gap-1.5">
-                                <i class="bi bi-person-lines-fill"></i> Query Q2: Lịch sử theo khách
-                            </span>
-                            <span class="text-[11px] font-mono bg-amber-100 text-amber-900 px-1.5 py-0.5 rounded">bookings_by_guest</span>
-                        </div>
-                        <form action="{{ url_for('booking.list_bookings') }}" method="get" class="space-y-3">
-                            <div>
-                                <select name="guest_id" required class="min-h-10 w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-900 outline-none focus-visible:border-amber-600">
-                                    <option value="">-- Chọn khách hàng tra cứu --</option>
-                                    {% for g in guests %}
-                                        {% set gid = g.guest_id if g.guest_id is defined else g['guest_id'] %}
-                                        {% set gname = g.full_name if g.full_name is defined else g['full_name'] %}
-                                        <option value="{{ gid }}" {% if guest_id == gid %}selected{% endif %}>{{ gname }} ({{ gid }})</option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-                            <button type="submit" class="inline-flex min-h-10 w-full cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-amber-700 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-amber-800">
-                                <i class="bi bi-search"></i> Tra cứu lịch sử khách (Q2)
-                            </button>
-                        </form>
-                    </div>
-
-                    <!-- BỘ LỌC 2: TRA CỨU THEO KHÁCH SẠN VÀ NGÀY (QUERY Q3) -->
-                    <div class="rounded-xl border border-indigo-200/70 bg-indigo-50/40 p-4">
-                        <div class="flex items-center justify-between mb-2">
-                            <span class="text-xs font-bold uppercase tracking-wider text-indigo-800 flex items-center gap-1.5">
-                                <i class="bi bi-building-check"></i> Query Q3: Khách sạn & Ngày
-                            </span>
-                            <span class="text-[11px] font-mono bg-indigo-100 text-indigo-900 px-1.5 py-0.5 rounded">bookings_by_hotel_date</span>
-                        </div>
-                        <form action="{{ url_for('booking.list_bookings') }}" method="get" class="space-y-3">
-                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                <select name="hotel_id" required class="min-h-10 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm text-slate-900 outline-none focus-visible:border-indigo-600">
-                                    <option value="">-- Khách sạn --</option>
-                                    {% for h in hotels %}
-                                        {% set hid = h.hotel_id if h.hotel_id is defined else h['hotel_id'] %}
-                                        {% set hname = h.name if h.name is defined else h['name'] %}
-                                        <option value="{{ hid }}" {% if hotel_id == hid %}selected{% endif %}>{{ hname }}</option>
-                                    {% endfor %}
-                                </select>
-                                <input name="check_in_date" type="date" required value="{{ check_in_date or '' }}" class="min-h-10 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm text-slate-900 outline-none focus-visible:border-indigo-600">
-                            </div>
-                            <button type="submit" class="inline-flex min-h-10 w-full cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-indigo-700 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-800">
-                                <i class="bi bi-search"></i> Tra cứu theo ngày (Q3)
-                            </button>
-                        </form>
-                    </div>
-                </div>
-
-                {% if search_type %}
-                    <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-600">
-                        <span>Đang lọc theo: <strong class="text-slate-900">{% if search_type == 'guest' %}Khách hàng (Mã: {{ guest_id }}){% else %}Khách sạn ({{ hotel_id }}) vào ngày ({{ check_in_date }}){% endif %}</strong></span>
-                        <a href="{{ url_for('booking.list_bookings') }}" class="text-amber-700 font-semibold hover:underline flex items-center gap-1">
-                            <i class="bi bi-x-circle"></i> Đặt lại bộ lọc
-                        </a>
-                    </div>
-                {% endif %}
             </div>
 
-            <!-- BẢNG DANH SÁCH KẾT QUẢ ĐẶT PHÒNG -->
-            <div class="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-                <div class="border-b border-slate-200 px-5 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <!-- NGÀY CHECK-IN & CHECK-OUT -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div>
+                    <label for="check-in-date" class="block text-xs font-semibold text-slate-700 mb-1">
+                        Ngày nhận phòng (Check-in) <span class="text-red-600">*</span>
+                    </label>
+                    <input id="check-in-date" name="check_in_date" type="date" required class="min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus-visible:border-amber-600 focus-visible:ring-2 focus-visible:ring-amber-200">
+                </div>
+                <div>
+                    <label for="check-out-date" class="block text-xs font-semibold text-slate-700 mb-1">
+                        Ngày trả phòng (Check-out) <span class="text-red-600">*</span>
+                    </label>
+                    <input id="check-out-date" name="check_out_date" type="date" required class="min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus-visible:border-amber-600 focus-visible:ring-2 focus-visible:ring-amber-200">
+                </div>
+            </div>
+
+            <!-- TỔNG TIỀN & PHƯƠNG THỨC THANH TOÁN -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div>
+                    <label for="total-amount" class="block text-xs font-semibold text-slate-700 mb-1">
+                        Tổng tiền (VNĐ) <span id="price-calc-hint" class="font-normal text-amber-700"></span>
+                    </label>
+                    <input id="total-amount" name="total_amount" type="number" step="10000" min="0" value="0" required oninput="updateDepositSummary()" class="min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-sm font-mono font-bold text-slate-900 outline-none transition focus-visible:border-amber-600 focus-visible:ring-2 focus-visible:ring-amber-200">
+                </div>
+                <div>
+                    <label for="payment-method" class="block text-xs font-semibold text-slate-700 mb-1">Phương thức thanh toán</label>
+                    <select id="payment-method" name="payment_method" class="min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus-visible:border-amber-600 focus-visible:ring-2 focus-visible:ring-amber-200">
+                        <option value="TIỀN MẶT">Tiền mặt</option>
+                        <option value="THẺ TÍN DỤNG">Thẻ tín dụng</option>
+                        <option value="CHUYỂN KHOẢN">Chuyển khoản</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- HÌNH THỨC & TIẾN ĐỘ THANH TOÁN (THANH TOÁN ĐỦ / ĐẶT CỌC / TRẢ SAU) -->
+            <div class="space-y-2.5 pt-2 border-t border-slate-100">
+                <label class="block text-xs font-semibold text-slate-700">
+                    Hình thức thanh toán <span class="text-red-600">*</span>
+                </label>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                    <label class="flex items-center gap-2.5 p-3 rounded-xl border border-slate-200 bg-white hover:border-amber-400 cursor-pointer transition has-[:checked]:border-emerald-600 has-[:checked]:bg-emerald-50/40">
+                        <input type="radio" name="payment_type" value="FULL" checked onchange="toggleDepositInput(this.value)" class="text-emerald-600 focus:ring-emerald-500">
+                        <div>
+                            <span class="text-xs font-bold text-slate-900 block">Thanh toán đủ (100%)</span>
+                            <span class="text-[10px] text-slate-500 block">Thu đủ tiền ngay khi đặt</span>
+                        </div>
+                    </label>
+                    <label class="flex items-center gap-2.5 p-3 rounded-xl border border-slate-200 bg-white hover:border-amber-400 cursor-pointer transition has-[:checked]:border-blue-600 has-[:checked]:bg-blue-50/50">
+                        <input type="radio" name="payment_type" value="DEPOSIT" onchange="toggleDepositInput(this.value)" class="text-blue-600 focus:ring-blue-500">
+                        <div>
+                            <span class="text-xs font-bold text-slate-900 block">Đặt cọc trước</span>
+                            <span class="text-[10px] text-slate-500 block">Cọc một phần (30-50%)</span>
+                        </div>
+                    </label>
+                    <label class="flex items-center gap-2.5 p-3 rounded-xl border border-slate-200 bg-white hover:border-amber-400 cursor-pointer transition has-[:checked]:border-amber-600 has-[:checked]:bg-amber-50/50">
+                        <input type="radio" name="payment_type" value="LATER" onchange="toggleDepositInput(this.value)" class="text-amber-600 focus:ring-amber-500">
+                        <div>
+                            <span class="text-xs font-bold text-slate-900 block">Chưa thanh toán</span>
+                            <span class="text-[10px] text-slate-500 block">Thu 100% khi nhận phòng</span>
+                        </div>
+                    </label>
+                </div>
+
+                <!-- KHỐI NHẬP TIỀN ĐẶT CỌC (HIỆN KHI CHỌN ĐẶT CỌC) -->
+                <div id="section-deposit-input" class="hidden p-3.5 rounded-2xl bg-blue-50/80 border border-blue-200 space-y-2.5">
+                    <div class="flex items-center justify-between">
+                        <label for="deposit-amount" class="text-xs font-bold text-blue-950 flex items-center gap-1.5">
+                            <span>💳</span> Số tiền khách đặt cọc trước (VNĐ) <span class="text-red-600">*</span>
+                        </label>
+                        <span id="deposit-summary-badge" class="text-[11px] font-bold text-blue-800 bg-blue-100 px-2 py-0.5 rounded-md"></span>
+                    </div>
                     <div>
-                        <h2 class="font-bold text-slate-950 flex items-center gap-2">
-                            <span>📋</span> Kết quả đặt phòng
-                        </h2>
-                        <p class="mt-0.5 text-xs text-slate-500">
-                            Bấm vào nút <strong class="text-amber-700">Xem Hóa Đơn</strong> ở mỗi dòng để xem phiếu chi tiết (Query Q4).
-                        </p>
+                        <input id="deposit-amount" name="deposit_amount" type="number" step="10000" min="0" placeholder="Nhập số tiền khách cọc..." oninput="updateDepositSummary()" class="min-h-11 w-full rounded-xl border border-blue-300 bg-white px-3.5 py-2 text-sm font-mono font-bold text-blue-950 outline-none transition focus-visible:border-blue-600 focus-visible:ring-2 focus-visible:ring-blue-200">
                     </div>
-                    {% if bookings %}
-                        <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">
-                            {{ bookings|length }} đơn đặt
-                        </span>
-                    {% endif %}
+                    <!-- Các nút gợi ý chọn nhanh số tiền cọc -->
+                    <div class="flex items-center gap-1.5 flex-wrap text-xs">
+                        <span class="text-[11px] text-blue-800 font-medium">Gợi ý nhanh:</span>
+                        <button type="button" onclick="setDepositPercent(0.3)" class="px-2.5 py-1 rounded-lg bg-white border border-blue-200 hover:bg-blue-100 text-blue-800 text-[11px] font-semibold transition cursor-pointer">Cọc 30%</button>
+                        <button type="button" onclick="setDepositPercent(0.5)" class="px-2.5 py-1 rounded-lg bg-white border border-blue-200 hover:bg-blue-100 text-blue-800 text-[11px] font-semibold transition cursor-pointer">Cọc 50%</button>
+                        <button type="button" onclick="setDepositFixed(500000)" class="px-2.5 py-1 rounded-lg bg-white border border-blue-200 hover:bg-blue-100 text-blue-800 text-[11px] font-semibold transition cursor-pointer">500.000 đ</button>
+                        <button type="button" onclick="setDepositFixed(1000000)" class="px-2.5 py-1 rounded-lg bg-white border border-blue-200 hover:bg-blue-100 text-blue-800 text-[11px] font-semibold transition cursor-pointer">1.000.000 đ</button>
+                    </div>
+                    <p id="deposit-remaining-hint" class="text-xs text-blue-900 font-medium"></p>
                 </div>
-
-                {% if bookings %}
-                    <div class="overflow-x-auto">
-                        <table class="w-full min-w-[780px] text-left text-sm">
-                            <thead class="bg-slate-50 text-xs uppercase tracking-wider text-slate-500">
-                                <tr>
-                                    <th scope="col" class="px-5 py-3.5 font-semibold">Mã Booking</th>
-                                    <th scope="col" class="px-5 py-3.5 font-semibold">Khách hàng</th>
-                                    <th scope="col" class="px-5 py-3.5 font-semibold">Khách sạn / Phòng</th>
-                                    <th scope="col" class="px-5 py-3.5 font-semibold">Thời gian</th>
-                                    <th scope="col" class="px-5 py-3.5 font-semibold">Tổng tiền</th>
-                                    <th scope="col" class="px-5 py-3.5 font-semibold">Trạng thái</th>
-                                    <th scope="col" class="px-5 py-3.5 text-right font-semibold">Thao tác</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-slate-100">
-                                {% for b in bookings %}
-                                    {% set b_id = b.booking_id if b.booking_id is defined else b['booking_id'] %}
-                                    {% set g_id = b.guest_id if b.guest_id is defined else b.get('guest_id', '') %}
-                                    {% set g_name = b.guest_name if b.guest_name is defined else b.get('guest_name', '') %}
-                                    {% set h_id = b.hotel_id if b.hotel_id is defined else b.get('hotel_id', '') %}
-                                    {% set r_num = b.room_number if b.room_number is defined else b.get('room_number', '') %}
-                                    {% set in_d = b.check_in_date if b.check_in_date is defined else b.get('check_in_date', '') %}
-                                    {% set out_d = b.check_out_date if b.check_out_date is defined else b.get('check_out_date', '') %}
-                                    {% set status_val = b.status if b.status is defined else b.get('status', 'CONFIRMED') %}
-                                    {% set amt = b.total_amount if b.total_amount is defined else b.get('total_amount', 0) %}
-
-                                    <tr class="align-middle transition hover:bg-amber-50/30">
-                                        <!-- Mã Booking -->
-                                        <td class="px-5 py-4 font-mono font-bold text-amber-900">
-                                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-amber-100 text-xs">
-                                                <i class="bi bi-ticket-perforated"></i> {{ b_id }}
-                                            </span>
-                                        </td>
-                                        <!-- Khách hàng -->
-                                        <td class="px-5 py-4">
-                                            <p class="font-semibold text-slate-900">{{ g_name or g_id }}</p>
-                                            {% if g_name and g_id %}
-                                                <p class="font-mono text-xs text-slate-500">{{ g_id }}</p>
-                                            {% endif %}
-                                        </td>
-                                        <!-- Khách sạn / Phòng -->
-                                        <td class="px-5 py-4 text-slate-700">
-                                            <p class="font-medium text-slate-900">{{ h_id }}</p>
-                                            <p class="text-xs text-slate-500">Phòng: <span class="font-semibold text-slate-800">{{ r_num }}</span></p>
-                                        </td>
-                                        <!-- Thời gian lưu trú -->
-                                        <td class="px-5 py-4 text-xs text-slate-600">
-                                            <p><span class="font-medium text-slate-900">In:</span> {{ in_d }}</p>
-                                            {% if out_d %}
-                                                <p><span class="font-medium text-slate-900">Out:</span> {{ out_d }}</p>
-                                            {% endif %}
-                                        </td>
-                                        <!-- Tổng tiền -->
-                                        <td class="px-5 py-4 font-semibold text-slate-900">
-                                            {% if amt %}
-                                                {{ "{:,.0f}".format(amt|float) }} đ
-                                            {% else %}
-                                                -
-                                            {% endif %}
-                                        </td>
-                                        <!-- Trạng thái -->
-                                        <td class="px-5 py-4">
-                                            {% if status_val == 'CONFIRMED' %}
-                                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">
-                                                    Đã xác nhận
-                                                </span>
-                                            {% elif status_val == 'CHECKED_IN' %}
-                                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">
-                                                    Đang ở
-                                                </span>
-                                            {% else %}
-                                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700">
-                                                    {{ status_val }}
-                                                </span>
-                                            {% endif %}
-                                        </td>
-                                        <!-- Nút hành động xem Hóa đơn (Q4) -->
-                                        <td class="px-5 py-4 text-right">
-                                            <a href="{{ url_for('booking.view_invoice', booking_id=b_id) }}" class="inline-flex min-h-10 cursor-pointer items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-900 shadow-sm transition hover:bg-amber-100 hover:border-amber-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500">
-                                                <i class="bi bi-receipt" aria-hidden="true"></i> Xem HĐ (Q4)
-                                            </a>
-                                        </td>
-                                    </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                {% else %}
-                    <!-- EMPTY STATE THÂN THIỆN -->
-                    <div class="px-6 py-14 text-center">
-                        <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-50 text-amber-600 text-2xl mb-3 shadow-inner">
-                            <i class="bi bi-calendar2-range"></i>
-                        </div>
-                        <h3 class="font-bold text-slate-900 text-base">Chưa có kết quả đặt phòng nào</h3>
-                        <p class="mx-auto mt-1 max-w-md text-sm text-slate-500">
-                            Sử dụng biểu mẫu bên trái để tạo Đặt phòng mới (sử dụng Batch Statement Q5) hoặc chọn bộ lọc để tra cứu theo khách hàng (Q2) hay theo khách sạn và ngày check-in (Q3).
-                        </p>
-                        <div class="mt-5 flex flex-wrap items-center justify-center gap-3">
-                            <a href="#booking-form" class="inline-flex items-center gap-1.5 rounded-xl bg-amber-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-amber-700 transition">
-                                <i class="bi bi-plus-lg"></i> Tạo đặt phòng mới
-                            </a>
-                        </div>
-                    </div>
-                {% endif %}
             </div>
 
-        </div>
-    </div>
-</section>
+            <!-- TRẠNG THÁI ĐẶT PHÒNG (Tự động xác nhận CONFIRMED) -->
+            <input type="hidden" id="status" name="status" value="CONFIRMED">
 
-<!-- JAVASCRIPT HỖ TRỢ ĐIỀN TÊN KHÁCH HÀNG TỰ ĐỘNG -->
+            <!-- MODAL FOOTER -->
+            <div class="pt-5 border-t border-slate-100 flex items-center justify-end gap-3">
+                <button type="button" onclick="closeBookingModal()" class="inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-300 bg-white px-5 py-2 text-sm font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 transition cursor-pointer">
+                    Hủy bỏ
+                </button>
+                <button type="submit" class="inline-flex min-h-11 cursor-pointer items-center justify-center rounded-xl bg-amber-600 px-6 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-amber-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500">
+                    Xác nhận đặt phòng
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ==================================================================== -->
+<!-- JAVASCRIPT ĐIỀU KHIỂN MODAL, TÍNH TIỀN VÀ LOAD PHÒNG                  -->
+<!-- ==================================================================== -->
 <script>
+    let currentGuestMode = 'existing';
+
+    function selectQuickAmenity(val) {
+        const select = document.getElementById('filter-amenity');
+        if (select) {
+            select.value = val;
+            const form = select.closest('form');
+            if (form) form.submit();
+        }
+    }
+
+    function openBookingModal() {
+        const modal = document.getElementById('booking-modal');
+        if (modal) {
+            modal.classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+
+            const hotelSelect = document.getElementById('select-hotel');
+            if (hotelSelect && hotelSelect.value) {
+                loadRoomsForHotel(hotelSelect.value);
+            }
+        }
+    }
+
+    const ROOMS_DATA = {
+        {% if filtered_rooms %}
+            {% for r in filtered_rooms %}
+            "{{ r.hotel_id }}_{{ r.room_number }}": {
+                hotel_id: {{ r.hotel_id | tojson }},
+                hotel_name: {{ r.hotel_name | tojson }},
+                room_number: {{ r.room_number | tojson }},
+                room_type: {{ r.room_type | tojson }},
+                price_per_night: {{ r.price_per_night }},
+                capacity: {{ r.capacity }},
+                bed_type: {{ r.bed_type | tojson }},
+                status: {{ r.status | tojson }},
+                description: {{ (r.description or '') | tojson }}
+            },
+            {% endfor %}
+        {% endif %}
+    };
+
+    function openBookingModalForRoom(hotelId, roomNumber, pricePerNight) {
+        const modal = document.getElementById('booking-modal');
+        if (!modal) return;
+
+        modal.classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+
+        const hotelSelect = document.getElementById('select-hotel');
+        if (hotelSelect && hotelId) {
+            hotelSelect.value = hotelId;
+        }
+
+        loadRoomsForHotel(hotelId, roomNumber);
+    }
+
+    function closeBookingModal() {
+        const modal = document.getElementById('booking-modal');
+        if (modal) {
+            modal.classList.add('hidden');
+            const rdModal = document.getElementById('room-detail-modal');
+            if (!rdModal || rdModal.classList.contains('hidden')) {
+                document.body.style.overflow = '';
+            }
+        }
+    }
+
+    // ----------------------------------------------------------------
+    // POPUP CHI TIẾT PHÒNG NHANH
+    // ----------------------------------------------------------------
+    async function openRoomDetailModal(hotelId, roomNumber) {
+        const modal = document.getElementById('room-detail-modal');
+        if (!modal) return;
+
+        // Mở popup ngay lập tức
+        modal.classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+
+        // Điền trạng thái khởi tạo
+        document.getElementById('rd-room-number').textContent = roomNumber;
+        document.getElementById('rd-room-type-badge').textContent = 'Đang tải...';
+        document.getElementById('rd-hotel-name').textContent = 'Đang tra cứu chi nhánh...';
+        document.getElementById('rd-price').textContent = '...';
+        document.getElementById('rd-capacity').textContent = '...';
+        document.getElementById('rd-bed').textContent = '...';
+        document.getElementById('rd-code').textContent = `${hotelId} - P.${roomNumber}`;
+        document.getElementById('rd-description').textContent = 'Đang nạp thông tin mô tả chi tiết phòng...';
+        document.getElementById('rd-room-features').innerHTML = '<span class="text-xs text-slate-400 italic">Đang tải tiện nghi...</span>';
+        document.getElementById('rd-hotel-amenities').innerHTML = '<span class="text-xs text-slate-400 italic">Đang tải tiện ích...</span>';
+        document.getElementById('rd-active-booking-section').classList.add('hidden');
+        document.getElementById('rd-loading').classList.remove('hidden');
+
+        // Hiển thị trước từ client cache để mở tức thì
+        const cacheKey = `${hotelId}_${roomNumber}`;
+        if (ROOMS_DATA && ROOMS_DATA[cacheKey]) {
+            const cr = ROOMS_DATA[cacheKey];
+            document.getElementById('rd-room-type-badge').textContent = cr.room_type;
+            document.getElementById('rd-hotel-name').textContent = cr.hotel_name;
+            document.getElementById('rd-price').textContent = `${Number(cr.price_per_night).toLocaleString('vi-VN')} đ`;
+            document.getElementById('rd-capacity').textContent = `${cr.capacity} người lớn`;
+            document.getElementById('rd-bed').textContent = `Giường ${cr.bed_type}`;
+            document.getElementById('rd-description').textContent = cr.description || 'Phòng lưu trú cao cấp tiêu chuẩn Mường Thanh Hospitality.';
+            renderStatusBadge(cr.status);
+            renderModalActions(cr.hotel_id, cr.room_number, cr.price_per_night, cr.status);
+        }
+
+        // Gọi API lấy dữ liệu chi tiết, tiện nghi và thông tin khách đang thuê
+        try {
+            const resp = await fetch(`/api/rooms/${encodeURIComponent(hotelId)}/${encodeURIComponent(roomNumber)}`);
+            const data = await resp.json();
+            document.getElementById('rd-loading').classList.add('hidden');
+
+            if (data.success && data.room) {
+                const r = data.room;
+                document.getElementById('rd-room-number').textContent = r.room_number;
+                document.getElementById('rd-room-type-badge').textContent = r.room_type;
+                document.getElementById('rd-hotel-name').textContent = `${r.hotel_name}${r.hotel_city ? ' • ' + r.hotel_city : ''}`;
+                document.getElementById('rd-price').textContent = r.formatted_price || `${Number(r.price_per_night).toLocaleString('vi-VN')} đ`;
+                document.getElementById('rd-capacity').textContent = `${r.capacity} người lớn`;
+                document.getElementById('rd-bed').textContent = `Giường ${r.bed_type}`;
+                document.getElementById('rd-code').textContent = `${r.hotel_id} - P.${r.room_number}`;
+                document.getElementById('rd-description').textContent = r.description;
+
+                renderStatusBadge(r.status);
+                renderModalActions(r.hotel_id, r.room_number, r.price_per_night, r.status);
+
+                // Render tiện nghi trong phòng
+                const rfContainer = document.getElementById('rd-room-features');
+                if (r.room_features && r.room_features.length > 0) {
+                    rfContainer.innerHTML = r.room_features.map(f => 
+                        `<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold bg-cyan-50 text-cyan-800 border border-cyan-200">
+                            <span class="h-1.5 w-1.5 rounded-full bg-cyan-500"></span> ${f}
+                        </span>`
+                    ).join('');
+                } else {
+                    rfContainer.innerHTML = '<span class="text-xs text-slate-400 italic">Trang thiết bị phòng tiêu chuẩn đầy đủ.</span>';
+                }
+
+                // Render tiện ích của chi nhánh khách sạn
+                const haContainer = document.getElementById('rd-hotel-amenities');
+                if (r.hotel_amenities && r.hotel_amenities.length > 0) {
+                    haContainer.innerHTML = r.hotel_amenities.map(a => 
+                        `<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold bg-amber-50 text-amber-900 border border-amber-200">
+                            <span class="text-amber-700 font-bold">★</span> ${a}
+                        </span>`
+                    ).join('');
+                } else {
+                    haContainer.innerHTML = '<span class="text-xs text-slate-400 italic">Tiện ích đang cập nhật.</span>';
+                }
+
+                // Nếu phòng đang có khách thuê, hiển thị thông tin khách
+                const abSection = document.getElementById('rd-active-booking-section');
+                if (r.active_booking) {
+                    const ab = r.active_booking;
+                    document.getElementById('rd-ab-id').textContent = `#${ab.booking_id}`;
+                    document.getElementById('rd-ab-guest-name').textContent = ab.guest_name || 'Khách lưu trú';
+                    document.getElementById('rd-ab-guest-phone').textContent = `SĐT: ${ab.guest_phone || '—'}`;
+                    document.getElementById('rd-ab-guest-card').textContent = ab.guest_id_card ? `CCCD: ${ab.guest_id_card}` : '';
+                    document.getElementById('rd-ab-dates').textContent = `${ab.check_in_date || '—'} → ${ab.check_out_date || '—'}`;
+                    document.getElementById('rd-ab-nights').textContent = `${ab.nights || 1} đêm lưu trú`;
+                    document.getElementById('rd-ab-amount').textContent = `Tổng tiền: ${Number(ab.total_amount || 0).toLocaleString('vi-VN')} đ`;
+
+                    // Hiển thị trạng thái thanh toán & tiền cọc
+                    const payBadge = document.getElementById('rd-ab-payment-badge');
+                    const depDetail = document.getElementById('rd-ab-deposit-detail');
+                    const pStatus = (ab.payment_status || 'PAID').toUpperCase();
+
+                    if (payBadge && depDetail) {
+                        if (pStatus === 'PAID') {
+                            payBadge.className = 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-300';
+                            payBadge.textContent = 'ĐÃ THANH TOÁN (100%)';
+                            depDetail.classList.add('hidden');
+                        } else if (pStatus === 'PARTIAL') {
+                            payBadge.className = 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-blue-800 border border-blue-300';
+                            payBadge.textContent = 'ĐÃ ĐẶT CỌC';
+                            depDetail.innerHTML = `Đã cọc: <strong class="text-blue-950 font-mono font-bold">${Number(ab.deposit_amount || 0).toLocaleString('vi-VN')} đ</strong> · Còn thiếu: <strong class="text-red-600 font-mono font-bold">${Number(ab.remaining_amount || 0).toLocaleString('vi-VN')} đ</strong>`;
+                            depDetail.classList.remove('hidden');
+                        } else {
+                            payBadge.className = 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-300';
+                            payBadge.textContent = 'CHƯA THANH TOÁN';
+                            depDetail.innerHTML = `Chưa thanh toán: Cần thu <strong class="text-red-600 font-mono font-bold">${Number(ab.total_amount || 0).toLocaleString('vi-VN')} đ</strong> khi nhận phòng`;
+                            depDetail.classList.remove('hidden');
+                        }
+                    }
+
+                    abSection.classList.remove('hidden');
+                } else {
+                    abSection.classList.add('hidden');
+                }
+            }
+        } catch (err) {
+            console.error('Lỗi tải chi tiết phòng:', err);
+            document.getElementById('rd-loading').classList.add('hidden');
+        }
+    }
+
+    function renderStatusBadge(status) {
+        const badgeContainer = document.getElementById('rd-status-badge');
+        if (!badgeContainer) return;
+
+        if (status === 'AVAILABLE') {
+            badgeContainer.innerHTML = `
+                <span class="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                    <span class="h-2 w-2 rounded-full bg-emerald-500"></span> Đang trống
+                </span>`;
+        } else if (status === 'OCCUPIED') {
+            badgeContainer.innerHTML = `
+                <span class="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-bold bg-amber-50 text-amber-900 border border-amber-200">
+                    <span class="h-2 w-2 rounded-full bg-amber-500"></span> Đang thuê
+                </span>`;
+        } else {
+            badgeContainer.innerHTML = `
+                <span class="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-bold bg-red-50 text-red-800 border border-red-200">
+                    <span class="h-2 w-2 rounded-full bg-red-500"></span> Bảo trì
+                </span>`;
+        }
+    }
+
+    function renderModalActions(hotelId, roomNumber, price, status) {
+        const container = document.getElementById('rd-modal-actions');
+        if (!container) return;
+
+        if (status === 'AVAILABLE') {
+            container.innerHTML = `
+                <button type="button" 
+                        onclick="closeRoomDetailModal(); openBookingModalForRoom('${hotelId}', '${roomNumber}', ${price});"
+                        class="inline-flex items-center justify-center gap-1.5 rounded-xl bg-amber-600 px-5 py-2 text-sm font-bold text-white shadow-sm hover:bg-amber-700 transition cursor-pointer">
+                    + Đặt phòng này ngay
+                </button>
+            `;
+        } else if (status === 'OCCUPIED') {
+            container.innerHTML = `
+                <a href="/invoices?q=${encodeURIComponent(roomNumber)}" 
+                   class="inline-flex items-center justify-center gap-1.5 rounded-xl border border-amber-300 bg-amber-50 px-4 py-2 text-xs font-bold text-amber-900 hover:bg-amber-100 transition">
+                    Tra cứu hóa đơn &rarr;
+                </a>
+            `;
+        } else {
+            container.innerHTML = `
+                <span class="text-xs text-slate-500 font-medium italic">Phòng đang bảo trì thiết bị</span>
+            `;
+        }
+    }
+
+    function closeRoomDetailModal() {
+        const modal = document.getElementById('room-detail-modal');
+        if (modal) {
+            modal.classList.add('hidden');
+            const bModal = document.getElementById('booking-modal');
+            if (!bModal || bModal.classList.contains('hidden')) {
+                document.body.style.overflow = '';
+            }
+        }
+    }
+
+    document.addEventListener('click', function(e) {
+        const bModal = document.getElementById('booking-modal');
+        if (bModal && !bModal.classList.contains('hidden') && e.target === bModal) {
+            closeBookingModal();
+        }
+        const rdModal = document.getElementById('room-detail-modal');
+        if (rdModal && !rdModal.classList.contains('hidden') && e.target === rdModal) {
+            closeRoomDetailModal();
+        }
+    });
+
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            closeBookingModal();
+            closeRoomDetailModal();
+        }
+    });
+
+    function setGuestMode(mode) {
+        currentGuestMode = mode;
+        const tabExisting = document.getElementById('tab-guest-existing');
+        const tabNew = document.getElementById('tab-guest-new');
+        const secExisting = document.getElementById('section-existing-guest');
+        const selectGuest = document.getElementById('select-guest');
+        const guestName = document.getElementById('guest-name');
+        const modeHint = document.getElementById('guest-mode-hint');
+
+        if (mode === 'new') {
+            if (tabExisting) tabExisting.className = 'px-2.5 py-1 rounded-md text-slate-600 hover:text-slate-900 transition';
+            if (tabNew) tabNew.className = 'px-2.5 py-1 rounded-md bg-white text-slate-900 shadow-sm transition';
+            if (secExisting) secExisting.classList.add('hidden');
+            if (selectGuest) selectGuest.value = 'NEW';
+            if (guestName) guestName.focus();
+            if (modeHint) modeHint.textContent = 'Khách mới sẽ tự động được cấp mã ID và lưu vào hệ thống khi tạo đơn.';
+        } else {
+            if (tabExisting) tabExisting.className = 'px-2.5 py-1 rounded-md bg-white text-slate-900 shadow-sm transition';
+            if (tabNew) tabNew.className = 'px-2.5 py-1 rounded-md text-slate-600 hover:text-slate-900 transition';
+            if (secExisting) secExisting.classList.remove('hidden');
+            if (selectGuest && selectGuest.value === 'NEW') selectGuest.value = '';
+            if (modeHint) modeHint.textContent = 'Chọn khách hàng có sẵn từ danh bạ hoặc nhập trực tiếp tên khách mới.';
+        }
+    }
+
     function onGuestChange(selectElement) {
+        if (selectElement.value === 'NEW') {
+            setGuestMode('new');
+            return;
+        }
         const selectedOption = selectElement.options[selectElement.selectedIndex];
-        const guestName = selectedOption.getAttribute('data-name');
+        const guestName = selectedOption ? selectedOption.getAttribute('data-name') : '';
         const nameInput = document.getElementById('guest-name');
         if (guestName && nameInput) {
             nameInput.value = guestName;
         }
     }
 
-    // Thiết lập ngày check-in mặc định hôm nay nếu chưa chọn
+    async function loadRoomsForHotel(hotelId, preselectedRoom = '') {
+        const roomSelect = document.getElementById('room-number');
+        if (!roomSelect) return;
+
+        if (!hotelId) {
+            roomSelect.innerHTML = '<option value="">-- Vui lòng chọn khách sạn trước --</option>';
+            calculateTotal();
+            return;
+        }
+
+        roomSelect.innerHTML = '<option value="">Đang tải danh sách phòng...</option>';
+
+        try {
+            const resp = await fetch(`/api/hotels/${encodeURIComponent(hotelId)}/rooms`);
+            if (!resp.ok) throw new Error('Không thể tải danh sách phòng');
+            const data = await resp.json();
+
+            if (!data.rooms || data.rooms.length === 0) {
+                roomSelect.innerHTML = '<option value="">-- Khách sạn chưa có phòng nào --</option>';
+                calculateTotal();
+                return;
+            }
+
+            roomSelect.innerHTML = '<option value="">-- Chọn phòng còn trống --</option>';
+            let foundPreselected = false;
+
+            data.rooms.forEach(r => {
+                const opt = document.createElement('option');
+                opt.value = r.room_number;
+                opt.dataset.price = r.price_per_night || 0;
+                opt.dataset.status = r.status || 'AVAILABLE';
+
+                const priceText = Number(r.price_per_night || 0).toLocaleString('vi-VN');
+                const roomType = r.room_type || 'Chuẩn';
+
+                if (r.status === 'MAINTENANCE') {
+                    opt.textContent = `Phòng ${r.room_number} (${roomType}) - [BẢO TRÌ - Khóa]`;
+                    opt.disabled = true;
+                    opt.className = 'text-red-500 bg-red-50';
+                } else if (r.status === 'OCCUPIED' || !r.is_available) {
+                    opt.textContent = `Phòng ${r.room_number} (${roomType}) - [ĐANG THUÊ - Khóa]`;
+                    opt.disabled = true;
+                    opt.className = 'text-amber-600 bg-amber-50';
+                } else {
+                    opt.textContent = `Phòng ${r.room_number} (${roomType}) - ${priceText} đ/đêm [Trống]`;
+                    if (preselectedRoom && preselectedRoom === r.room_number) {
+                        opt.selected = true;
+                        foundPreselected = true;
+                    }
+                }
+                roomSelect.appendChild(opt);
+            });
+
+            if (!foundPreselected) {
+                // Tự chọn phòng trống đầu tiên nếu không có phòng chỉ định
+                for (let i = 0; i < roomSelect.options.length; i++) {
+                    if (!roomSelect.options[i].disabled && roomSelect.options[i].value) {
+                        roomSelect.options[i].selected = true;
+                        break;
+                    }
+                }
+            }
+
+            calculateTotal();
+        } catch (err) {
+            console.error('Lỗi khi tải phòng:', err);
+            roomSelect.innerHTML = '<option value="">Lỗi tải dữ liệu phòng</option>';
+        }
+    }
+
+    function toggleDepositInput(type) {
+        const sec = document.getElementById('section-deposit-input');
+        if (!sec) return;
+        if (type === 'DEPOSIT') {
+            sec.classList.remove('hidden');
+            const depInput = document.getElementById('deposit-amount');
+            if (!depInput.value || parseFloat(depInput.value) <= 0) {
+                setDepositPercent(0.5);
+            } else {
+                updateDepositSummary();
+            }
+        } else {
+            sec.classList.add('hidden');
+        }
+    }
+
+    function setDepositPercent(percent) {
+        const total = parseFloat(document.getElementById('total-amount').value) || 0;
+        const deposit = Math.round((total * percent) / 10000) * 10000;
+        const depInput = document.getElementById('deposit-amount');
+        if (depInput) {
+            depInput.value = deposit;
+            updateDepositSummary();
+        }
+    }
+
+    function setDepositFixed(amount) {
+        const depInput = document.getElementById('deposit-amount');
+        if (depInput) {
+            depInput.value = amount;
+            updateDepositSummary();
+        }
+    }
+
+    function updateDepositSummary() {
+        const total = parseFloat(document.getElementById('total-amount').value) || 0;
+        const depInput = document.getElementById('deposit-amount');
+        const badge = document.getElementById('deposit-summary-badge');
+        const hint = document.getElementById('deposit-remaining-hint');
+        if (!depInput || !badge || !hint) return;
+
+        const deposit = parseFloat(depInput.value) || 0;
+        const remaining = Math.max(0, total - deposit);
+        const percent = total > 0 ? Math.min(100, Math.round((deposit / total) * 100)) : 0;
+
+        badge.textContent = `Đã cọc: ${percent}%`;
+        hint.innerHTML = `Khách đặt cọc: <strong class="text-blue-950">${deposit.toLocaleString('vi-VN')} đ</strong> · Cần thu khi nhận/trả phòng: <strong class="text-red-600 font-bold">${remaining.toLocaleString('vi-VN')} đ</strong>`;
+    }
+
+    function calculateTotal() {
+        const checkInInput = document.getElementById('check-in-date');
+        const checkOutInput = document.getElementById('check-out-date');
+        const roomSelect = document.getElementById('room-number');
+        const totalAmountInput = document.getElementById('total-amount');
+        const priceCalcHint = document.getElementById('price-calc-hint');
+
+        if (!checkInInput || !checkOutInput || !roomSelect || !totalAmountInput) return;
+
+        const checkInVal = checkInInput.value;
+        const checkOutVal = checkOutInput.value;
+        const selectedOpt = roomSelect.options[roomSelect.selectedIndex];
+        const pricePerNight = selectedOpt ? parseFloat(selectedOpt.dataset.price || 0) : 0;
+
+        if (checkInVal && checkOutVal) {
+            const d1 = new Date(checkInVal);
+            const d2 = new Date(checkOutVal);
+            const diffTime = d2.getTime() - d1.getTime();
+            const nights = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+            if (nights > 0 && pricePerNight > 0) {
+                const total = nights * pricePerNight;
+                totalAmountInput.value = total;
+                if (priceCalcHint) {
+                    priceCalcHint.textContent = `(${nights} đêm × ${pricePerNight.toLocaleString('vi-VN')} đ/đêm)`;
+                }
+                updateDepositSummary();
+                return;
+            }
+        }
+
+        if (pricePerNight > 0 && priceCalcHint) {
+            priceCalcHint.textContent = `(${pricePerNight.toLocaleString('vi-VN')} đ/đêm)`;
+        } else if (priceCalcHint) {
+            priceCalcHint.textContent = '';
+        }
+        updateDepositSummary();
+    }
+
     document.addEventListener('DOMContentLoaded', function() {
         const checkIn = document.getElementById('check-in-date');
         const checkOut = document.getElementById('check-out-date');
-        if (checkIn && !checkIn.value) {
-            const today = new Date().toISOString().split('T')[0];
-            checkIn.value = today;
-            if (checkOut && !checkOut.value) {
-                const tomorrow = new Date();
-                tomorrow.setDate(tomorrow.getDate() + 2);
-                checkOut.value = tomorrow.toISOString().split('T')[0];
-            }
+        const hotelSelect = document.getElementById('select-hotel');
+        const roomSelect = document.getElementById('room-number');
+        const bookingForm = document.getElementById('form-create-booking');
+
+        const today = new Date();
+        const todayStr = today.toISOString().split('T')[0];
+        
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        const tomorrowStr = tomorrow.toISOString().split('T')[0];
+
+        if (checkIn) {
+            checkIn.min = todayStr;
+            if (!checkIn.value) checkIn.value = todayStr;
+        }
+
+        if (checkOut) {
+            checkOut.min = tomorrowStr;
+            if (!checkOut.value) checkOut.value = tomorrowStr;
+        }
+
+        if (checkIn && checkOut) {
+            checkIn.addEventListener('change', function() {
+                if (!checkIn.value) return;
+                const nextDay = new Date(checkIn.value);
+                nextDay.setDate(nextDay.getDate() + 1);
+                const nextDayStr = nextDay.toISOString().split('T')[0];
+                checkOut.min = nextDayStr;
+
+                if (!checkOut.value || checkOut.value <= checkIn.value) {
+                    checkOut.value = nextDayStr;
+                }
+                calculateTotal();
+            });
+
+            checkOut.addEventListener('change', function() {
+                if (checkIn.value && checkOut.value <= checkIn.value) {
+                    alert('Ngày Check-out phải sau ngày Check-in ít nhất 1 đêm!');
+                    const nextDay = new Date(checkIn.value);
+                    nextDay.setDate(nextDay.getDate() + 1);
+                    checkOut.value = nextDay.toISOString().split('T')[0];
+                }
+                calculateTotal();
+            });
+        }
+
+        if (hotelSelect) {
+            hotelSelect.addEventListener('change', function() {
+                loadRoomsForHotel(this.value);
+            });
+        }
+
+        if (roomSelect) {
+            roomSelect.addEventListener('change', calculateTotal);
+        }
+
+        if (bookingForm) {
+            bookingForm.addEventListener('submit', function(e) {
+                const selectGuest = document.getElementById('select-guest');
+                const guestNameInput = document.getElementById('guest-name');
+                const guestNameVal = guestNameInput ? guestNameInput.value.trim() : '';
+
+                if (selectGuest && !selectGuest.value && guestNameVal) {
+                    selectGuest.value = 'NEW';
+                }
+
+                if ((!selectGuest || !selectGuest.value) && !guestNameVal) {
+                    e.preventDefault();
+                    alert('Vui lòng chọn khách hàng có sẵn hoặc nhập họ và tên khách!');
+                    if (guestNameInput) guestNameInput.focus();
+                    return;
+                }
+
+                if (!roomSelect || !roomSelect.value) {
+                    e.preventDefault();
+                    alert('Vui lòng chọn phòng lưu trú hợp lệ!');
+                    return;
+                }
+
+                const selectedOpt = roomSelect.options[roomSelect.selectedIndex];
+                if (selectedOpt && selectedOpt.disabled) {
+                    e.preventDefault();
+                    alert('Phòng đã chọn đang được sử dụng hoặc bảo trì, vui lòng chọn phòng khác!');
+                    return;
+                }
+
+                if (checkIn.value && checkOut.value && checkOut.value <= checkIn.value) {
+                    e.preventDefault();
+                    alert('Ngày Check-out phải sau ngày Check-in!');
+                    return;
+                }
+            });
         }
     });
 </script>

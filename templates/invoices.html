@@ -3,209 +3,905 @@
 {% block title %}Hóa Đơn Thanh Toán - QLKS NoSQL{% endblock %}
 
 {% block content %}
-<section aria-labelledby="invoice-heading" class="max-w-4xl mx-auto space-y-6">
-    <!-- THANH ĐIỀU HƯỚNG TRÊN CÙNG -->
-    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-slate-200">
-        <div>
-            <h1 id="invoice-heading" class="flex items-center gap-2 text-2xl sm:text-3xl font-bold text-slate-950">
-                <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-100 text-amber-700 text-xl" aria-hidden="true">
-                    <i class="bi bi-receipt"></i>
-                </span>
-                Hóa Đơn Thanh Toán
-            </h1>
-            <p class="mt-1 text-xs sm:text-sm text-slate-500">
-                Truy vấn Query Q4: Bảng <code class="text-amber-800 bg-amber-50 px-1.5 py-0.5 rounded font-mono font-medium">invoices_by_booking</code> theo Partition Key <code class="text-slate-800 font-mono">{{ booking_id }}</code>.
-            </p>
-        </div>
-        <div class="flex items-center gap-2">
-            <a href="{{ url_for('booking.list_bookings') }}" class="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 transition">
-                <i class="bi bi-arrow-left"></i> Danh sách đặt phòng
-            </a>
-            {% if invoice %}
-                <button type="button" onclick="window.print()" class="inline-flex min-h-10 items-center gap-1.5 rounded-xl bg-amber-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-amber-700 transition cursor-pointer">
-                    <i class="bi bi-printer"></i> In hóa đơn
-                </button>
-            {% endif %}
-        </div>
-    </div>
+<section aria-labelledby="invoice-heading" class="w-full space-y-6">
 
-    {% if invoice %}
-        {% set inv_id = invoice.invoice_id if invoice.invoice_id is defined else invoice.get('invoice_id', '') %}
-        {% set b_id = invoice.booking_id if invoice.booking_id is defined else invoice.get('booking_id', booking_id) %}
-        {% set g_name = invoice.guest_name if invoice.guest_name is defined else invoice.get('guest_name', '') %}
-        {% set h_id = invoice.hotel_id if invoice.hotel_id is defined else invoice.get('hotel_id', '') %}
-        {% set issue_d = invoice.issue_date if invoice.issue_date is defined else invoice.get('issue_date', '') %}
-        {% set pay_m = invoice.payment_method if invoice.payment_method is defined else invoice.get('payment_method', 'TIỀN MẶT') %}
-        {% set pay_s = invoice.payment_status if invoice.payment_status is defined else invoice.get('payment_status', 'PAID') %}
-        {% set total_amt = invoice.total_amount if invoice.total_amount is defined else invoice.get('total_amount', 0) %}
-
-        <!-- PHIẾU HÓA ĐƠN CAO CẤP (RECEIPT CARD) -->
-        <article class="bg-white rounded-3xl border border-slate-200 shadow-lg overflow-hidden print:border-none print:shadow-none">
-            <!-- HEADER HÓA ĐƠN -->
-            <div class="bg-gradient-to-r from-slate-900 via-slate-800 to-amber-950 p-6 sm:p-8 text-white">
-                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <div>
-                        <div class="flex items-center gap-2">
-                            <span class="text-3xl">🏨</span>
-                            <span class="text-xl font-bold tracking-tight">HỆ THỐNG QUẢN LÝ KHÁCH SẠN</span>
-                        </div>
-                        <p class="text-xs text-amber-200/80 mt-1 uppercase tracking-wider font-semibold">
-                            Phiếu Hóa Đơn Dịch Vụ Lưu Trú · Cassandra NoSQL
-                        </p>
-                    </div>
-                    <div class="sm:text-right">
-                        {% if pay_s == 'PAID' %}
-                            <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
-                                <i class="bi bi-patch-check-fill"></i> Đã Thanh Toán
-                            </span>
-                        {% else %}
-                            <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/40">
-                                <i class="bi bi-clock-history"></i> Chưa Thanh Toán
-                            </span>
-                        {% endif %}
-                        <p class="text-xs font-mono text-slate-300 mt-1.5">Mã HĐ: <strong class="text-white">{{ inv_id }}</strong></p>
-                    </div>
-                </div>
+    {% if view_mode == 'detail' %}
+        <!-- ============================================================== -->
+        <!-- CHẾ ĐỘ XEM CHI TIẾT 1 HÓA ĐƠN (THEO BOOKING_ID)                 -->
+        <!-- ============================================================== -->
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2">
+            <div>
+                <a href="{{ url_for('booking.list_invoices') }}" class="text-xs font-semibold text-amber-700 hover:underline mb-1 inline-block">
+                    &larr; Quay lại danh sách hóa đơn
+                </a>
+                <h1 id="invoice-heading" class="text-2xl sm:text-3xl font-bold text-slate-950">
+                    Chi Tiết Hóa Đơn Thanh Toán
+                </h1>
+                <p class="mt-1 text-xs sm:text-sm text-slate-500">
+                    Mã đơn đặt phòng liên kết: <strong class="text-slate-800 font-mono">{{ booking_id }}</strong>
+                </p>
             </div>
-
-            <!-- NỘI DUNG CHI TIẾT HÓA ĐƠN -->
-            <div class="p-6 sm:p-8 space-y-6">
-                <!-- KHỐI THÔNG TIN 2 CỘT -->
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 pb-6 border-b border-slate-100">
-                    <div>
-                        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Thông tin khách hàng & Đặt phòng</h3>
-                        <div class="space-y-1.5 text-sm">
-                            <p class="text-slate-500">Khách hàng: <strong class="text-slate-900 text-base font-bold">{{ g_name or 'Khách vãng lai' }}</strong></p>
-                            <p class="text-slate-500">Mã đặt phòng: <span class="font-mono font-semibold text-amber-800 bg-amber-50 px-2 py-0.5 rounded">{{ b_id }}</span></p>
-                            <p class="text-slate-500">Cơ sở lưu trú: <strong class="text-slate-800">{{ h_id }}</strong></p>
-                        </div>
-                    </div>
-
-                    <div class="sm:text-right">
-                        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Thông tin hóa đơn</h3>
-                        <div class="space-y-1.5 text-sm">
-                            <p class="text-slate-500">Ngày phát hành: <strong class="text-slate-900">{{ issue_d }}</strong></p>
-                            <p class="text-slate-500">Hình thức thanh toán: <span class="font-semibold text-slate-800">{{ pay_m }}</span></p>
-                            <p class="text-slate-500">Trạng thái: <strong class="text-emerald-700">{{ pay_s }}</strong></p>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- BẢNG CHI TIẾT MỤC THANH TOÁN -->
-                <div>
-                    <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">Chi tiết thanh toán</h3>
-                    <div class="overflow-hidden rounded-xl border border-slate-200">
-                        <table class="w-full text-left text-sm">
-                            <thead class="bg-slate-50 text-xs uppercase tracking-wider text-slate-500 border-b border-slate-200">
-                                <tr>
-                                    <th scope="col" class="px-4 py-3 font-semibold">STT</th>
-                                    <th scope="col" class="px-4 py-3 font-semibold">Diễn giải dịch vụ</th>
-                                    <th scope="col" class="px-4 py-3 text-center font-semibold">Số lượng</th>
-                                    <th scope="col" class="px-4 py-3 text-right font-semibold">Đơn giá</th>
-                                    <th scope="col" class="px-4 py-3 text-right font-semibold">Thành tiền</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-slate-100">
-                                <tr>
-                                    <td class="px-4 py-3.5 text-slate-500">1</td>
-                                    <td class="px-4 py-3.5 font-medium text-slate-900">
-                                        Dịch vụ lưu trú phòng khách sạn (Mã đặt phòng: {{ b_id }})
-                                        <p class="text-xs text-slate-400 mt-0.5">Bao gồm tiện ích phòng tiêu chuẩn, dọn phòng hàng ngày</p>
-                                    </td>
-                                    <td class="px-4 py-3.5 text-center text-slate-600">1 gói</td>
-                                    <td class="px-4 py-3.5 text-right font-mono text-slate-700">
-                                        {% if total_amt %}{{ "{:,.0f}".format(total_amt|float) }} đ{% else %}0 đ{% endif %}
-                                    </td>
-                                    <td class="px-4 py-3.5 text-right font-mono font-semibold text-slate-900">
-                                        {% if total_amt %}{{ "{:,.0f}".format(total_amt|float) }} đ{% else %}0 đ{% endif %}
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
-                <!-- TỔNG CỘNG TIỀN -->
-                <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4 pt-4 border-t border-slate-200">
-                    <div class="text-xs text-slate-400 max-w-sm">
-                        <p class="flex items-center gap-1 text-slate-500 font-semibold mb-1">
-                            <i class="bi bi-shield-check text-emerald-600"></i> Hóa đơn điện tử hợp lệ
-                        </p>
-                        Dữ liệu được lưu trữ phân tán an toàn và bảo mật trên AstraDB Cloud (Apache Cassandra).
-                    </div>
-                    <div class="space-y-1 sm:text-right min-w-[240px]">
-                        <div class="flex justify-between sm:justify-end gap-6 text-sm text-slate-500">
-                            <span>Tạm tính:</span>
-                            <span class="font-mono font-medium text-slate-800">{% if total_amt %}{{ "{:,.0f}".format(total_amt|float) }} đ{% else %}0 đ{% endif %}</span>
-                        </div>
-                        <div class="flex justify-between sm:justify-end gap-6 text-sm text-slate-500">
-                            <span>Thuế VAT (0%):</span>
-                            <span class="font-mono text-slate-800">0 đ</span>
-                        </div>
-                        <div class="flex justify-between sm:justify-end gap-6 text-base sm:text-lg font-extrabold text-amber-900 pt-2 border-t border-slate-200">
-                            <span>TỔNG CỘNG:</span>
-                            <span class="font-mono text-amber-700 text-xl">
-                                {% if total_amt %}{{ "{:,.0f}".format(total_amt|float) }} đ{% else %}0 đ{% endif %}
-                            </span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- CHỮ KÝ & LỜI CẢM ƠN -->
-                <div class="pt-6 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between text-xs text-slate-400 gap-4">
-                    <p>Cảm ơn quý khách đã tin tưởng và sử dụng dịch vụ khách sạn của chúng tôi!</p>
-                    <p class="font-mono">QLKS NoSQL · Partition Key: {{ b_id }}</p>
-                </div>
+            <div class="flex items-center gap-2">
+                {% if invoice %}
+                    <button type="button" onclick="window.print()" class="inline-flex min-h-10 items-center justify-center rounded-xl bg-amber-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-amber-700 transition cursor-pointer">
+                        In hóa đơn
+                    </button>
+                {% endif %}
             </div>
-        </article>
+        </div>
+
+        {% if invoice %}
+            {% set inv_id = invoice.invoice_id if invoice.invoice_id is defined else invoice.get('invoice_id', '') %}
+            {% set b_id = invoice.booking_id if invoice.booking_id is defined else invoice.get('booking_id', booking_id) %}
+            {% set g_name = invoice.guest_name if invoice.guest_name is defined else invoice.get('guest_name', '') %}
+            {% set h_id = invoice.hotel_id if invoice.hotel_id is defined else invoice.get('hotel_id', '') %}
+            {% set h_name = invoice.hotel_name if invoice.hotel_name is defined else invoice.get('hotel_name', h_id) %}
+            {% set r_num = invoice.room_number if invoice.room_number is defined else invoice.get('room_number', '') %}
+            {% set c_in = invoice.check_in_date if invoice.check_in_date is defined else invoice.get('check_in_date', '') %}
+            {% set c_out = invoice.check_out_date if invoice.check_out_date is defined else invoice.get('check_out_date', '') %}
+            {% set nights = invoice.nights if invoice.nights is defined else invoice.get('nights', 1) %}
+            {% set issue_d = invoice.issue_date if invoice.issue_date is defined else invoice.get('issue_date', '') %}
+            {% set pay_m = invoice.payment_method if invoice.payment_method is defined else invoice.get('payment_method', 'TIỀN MẶT') %}
+            {% set pay_s = invoice.payment_status if invoice.payment_status is defined else invoice.get('payment_status', 'PAID') %}
+            {% set total_amt = invoice.total_amount if invoice.total_amount is defined else invoice.get('total_amount', 0) %}
+            {% set dep_amt = invoice.deposit_amount if invoice.deposit_amount is defined else invoice.get('deposit_amount', (total_amt if pay_s == 'PAID' else 0)) %}
+            {% set rem_amt = invoice.remaining_amount if invoice.remaining_amount is defined else invoice.get('remaining_amount', (0 if pay_s == 'PAID' else total_amt)) %}
+
+            <!-- PHIẾU HÓA ĐƠN CAO CẤP (RECEIPT CARD) -->
+            <article class="bg-white rounded-3xl border border-slate-200 shadow-lg overflow-hidden max-w-4xl mx-auto print:border-none print:shadow-none">
+                <!-- HEADER HÓA ĐƠN -->
+                <div class="bg-gradient-to-r from-slate-900 via-slate-800 to-amber-950 p-6 sm:p-8 text-white">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div>
+                            <span class="text-xl font-bold tracking-tight">MƯỜNG THANH HOSPITALITY</span>
+                            <p class="text-xs text-amber-200/80 mt-1 uppercase tracking-wider font-semibold">
+                                Phiếu Hóa Đơn Dịch Vụ Lưu Trú · Quản Trị Khách Sạn
+                            </p>
+                        </div>
+                        <div class="sm:text-right">
+                            {% if pay_s == 'PAID' %}
+                                <span class="inline-flex items-center px-3.5 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                                    Đã Thanh Toán (100%)
+                                </span>
+                            {% elif pay_s == 'PARTIAL' %}
+                                <span class="inline-flex items-center px-3.5 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider bg-blue-500/25 text-blue-300 border border-blue-500/50">
+                                    Đã Đặt Cọc
+                                </span>
+                            {% else %}
+                                <span class="inline-flex items-center px-3.5 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                                    Chờ Thanh Toán
+                                </span>
+                            {% endif %}
+                            <p class="text-xs font-mono text-slate-300 mt-1.5">Mã HĐ: <strong class="text-white">{{ inv_id }}</strong></p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- NỘI DUNG CHI TIẾT HÓA ĐƠN -->
+                <div class="p-6 sm:p-8 space-y-6">
+                    <!-- KHỐI THÔNG TIN 2 CỘT -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 pb-6 border-b border-slate-100">
+                        <div>
+                            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Thông tin khách hàng & Lưu trú</h3>
+                            <div class="space-y-1.5 text-sm">
+                                <p class="text-slate-500">Khách hàng: <strong class="text-slate-900 text-base font-bold">{{ g_name or 'Khách vãng lai' }}</strong></p>
+                                <p class="text-slate-500">Mã đặt phòng: <span class="font-mono font-semibold text-amber-800 bg-amber-50 px-2 py-0.5 rounded">{{ b_id }}</span></p>
+                                <p class="text-slate-500">Cơ sở lưu trú: <strong class="text-slate-800">{{ h_name or h_id }}</strong> {% if r_num %}(Phòng {{ r_num }}){% endif %}</p>
+                                {% if c_in and c_out %}
+                                    <p class="text-slate-500">Thời gian lưu trú: <strong class="text-slate-800">{{ c_in }} &rarr; {{ c_out }}</strong> ({{ nights }} đêm)</p>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="sm:text-right">
+                            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Thông tin chứng từ</h3>
+                            <div class="space-y-1.5 text-sm">
+                                <p class="text-slate-500">Ngày phát hành: <strong class="text-slate-900">{{ issue_d }}</strong></p>
+                                <p class="text-slate-500">Hình thức thanh toán: <span class="font-semibold text-slate-800">{{ pay_m }}</span></p>
+                                <p class="text-slate-500">Trạng thái: <strong class="text-emerald-700">{{ pay_s }}</strong></p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- BẢNG CHI TIẾT MỤC THANH TOÁN -->
+                    <div>
+                        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">Chi tiết thanh toán dịch vụ</h3>
+                        <div class="overflow-hidden rounded-xl border border-slate-200">
+                            <table class="w-full text-left text-sm">
+                                <thead class="bg-slate-50 text-xs uppercase tracking-wider text-slate-500 border-b border-slate-200">
+                                    <tr>
+                                        <th scope="col" class="px-4 py-3 font-semibold">STT</th>
+                                        <th scope="col" class="px-4 py-3 font-semibold">Diễn giải dịch vụ</th>
+                                        <th scope="col" class="px-4 py-3 text-center font-semibold">Thời lượng</th>
+                                        <th scope="col" class="px-4 py-3 text-right font-semibold">Đơn giá / đêm</th>
+                                        <th scope="col" class="px-4 py-3 text-right font-semibold">Thành tiền</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-100">
+                                    <tr>
+                                        <td class="px-4 py-3.5 text-slate-500">1</td>
+                                        <td class="px-4 py-3.5 font-medium text-slate-900">
+                                            Dịch vụ lưu trú phòng khách sạn (Mã đặt phòng: {{ b_id }})
+                                            <p class="text-xs text-slate-400 mt-0.5">Tiêu chuẩn Mường Thanh Hospitality · Đã gồm dọn phòng, buffet sáng</p>
+                                        </td>
+                                        <td class="px-4 py-3.5 text-center text-slate-600">{{ nights }} đêm</td>
+                                        <td class="px-4 py-3.5 text-right font-mono text-slate-700">
+                                            {% if total_amt and nights %}
+                                                {{ "{:,.0f}".format((total_amt|float) / (nights|float)) }} đ
+                                            {% else %}
+                                                -
+                                            {% endif %}
+                                        </td>
+                                        <td class="px-4 py-3.5 text-right font-mono font-semibold text-slate-900">
+                                            {% if total_amt %}{{ "{:,.0f}".format(total_amt|float) }} đ{% else %}0 đ{% endif %}
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- TỔNG CỘNG TIỀN -->
+                    <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4 pt-4 border-t border-slate-200">
+                        <div class="text-xs text-slate-400 max-w-sm">
+                            <p class="text-slate-600 font-semibold mb-1">
+                                Hóa đơn điện tử hợp lệ
+                            </p>
+                            Dữ liệu được lưu trữ phân tán an toàn trên AstraDB Cloud (Apache Cassandra Query Q4).
+                        </div>
+                        <div class="space-y-1 sm:text-right min-w-[280px]">
+                            <div class="flex justify-between sm:justify-end gap-6 text-sm text-slate-500">
+                                <span>Tổng tiền dịch vụ:</span>
+                                <span class="font-mono font-medium text-slate-800">{% if total_amt %}{{ "{:,.0f}".format(total_amt|float) }} đ{% else %}0 đ{% endif %}</span>
+                            </div>
+                            <div class="flex justify-between sm:justify-end gap-6 text-sm text-slate-500">
+                                <span>Khách đã cọc / thanh toán:</span>
+                                <span class="font-mono font-semibold text-emerald-700">{% if dep_amt %}{{ "{:,.0f}".format(dep_amt|float) }} đ{% else %}0 đ{% endif %}</span>
+                            </div>
+                            <div class="flex justify-between sm:justify-end gap-6 text-sm {% if rem_amt > 0 %}text-amber-700 font-semibold{% else %}text-slate-500{% endif %}">
+                                <span>Số tiền còn thiếu:</span>
+                                <span class="font-mono font-bold {% if rem_amt > 0 %}text-red-600{% else %}text-slate-700{% endif %}">
+                                    {% if rem_amt %}{{ "{:,.0f}".format(rem_amt|float) }} đ{% else %}0 đ (Đã đủ){% endif %}
+                                </span>
+                            </div>
+                            <div class="flex justify-between sm:justify-end gap-6 text-base sm:text-lg font-extrabold text-amber-900 pt-2 border-t border-slate-200">
+                                <span>TỔNG CỘNG:</span>
+                                <span class="font-mono text-amber-700 text-xl">
+                                    {% if total_amt %}{{ "{:,.0f}".format(total_amt|float) }} đ{% else %}0 đ{% endif %}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {% if rem_amt > 0 %}
+                        <!-- KHỐI HÀNH ĐỘNG DÀNH CHO LỄ TÂN: THU NỐT TIỀN CÒN THIẾU -->
+                        <div class="mt-4 p-4 sm:p-5 rounded-2xl bg-amber-50/80 border border-amber-200 text-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4 print:hidden">
+                            <div class="flex items-start gap-3">
+                                <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-600 text-white font-bold text-base">
+                                    💳
+                                </span>
+                                <div>
+                                    <h4 class="text-sm font-bold text-slate-900">
+                                        Khách hàng còn thiếu: <span class="text-red-600 font-mono font-extrabold text-base">{{ "{:,.0f}".format(rem_amt|float) }} đ</span>
+                                    </h4>
+                                    <p class="text-xs text-slate-600 mt-0.5">
+                                        Khách đã đặt cọc trước {{ "{:,.0f}".format(dep_amt|float) }} đ. Lễ tân xác nhận đã thu đủ số tiền còn lại để chuyển trạng thái sang Đã thanh toán.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <form action="{{ url_for('booking.settle_invoice_form', booking_id=b_id) }}" method="post" class="flex flex-wrap items-center gap-2">
+                                <input type="hidden" name="redirect_to" value="detail">
+                                <select name="payment_method" class="min-h-10 rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-800 outline-none focus-visible:border-amber-600">
+                                    <option value="TIỀN MẶT">Tiền mặt</option>
+                                    <option value="CHUYỂN KHOẢN">Chuyển khoản</option>
+                                    <option value="THẺ TÍN DỤNG">Thẻ tín dụng</option>
+                                </select>
+                                <button type="submit" class="inline-flex min-h-10 items-center justify-center rounded-xl bg-emerald-600 hover:bg-emerald-700 px-4 py-2 text-xs font-bold text-white shadow-sm transition cursor-pointer">
+                                    Xác nhận đã thu nốt
+                                </button>
+                            </form>
+                        </div>
+                    {% endif %}
+
+                    <!-- CHỮ KÝ & LỜI CẢM ƠN -->
+                    <div class="pt-6 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between text-xs text-slate-400 gap-4">
+                        <p>Cảm ơn quý khách đã tin tưởng và sử dụng dịch vụ khách sạn của chúng tôi!</p>
+                        <p class="font-mono">Mường Thanh Hospitality · Partition Key: {{ b_id }}</p>
+                    </div>
+                </div>
+            </article>
+
+        {% else %}
+            <!-- CHƯA CÓ HÓA ĐƠN CHO BOOKING NÀY: FORM TẠO BỔ SUNG NHANH -->
+            <div class="rounded-3xl border border-slate-200 bg-white p-8 sm:p-10 text-center shadow-sm max-w-md mx-auto">
+                <h2 class="text-xl font-bold text-slate-900 mb-1">Chưa có hóa đơn cho mã đặt phòng</h2>
+                <p class="text-sm font-mono text-amber-800 font-semibold mb-3">{{ booking_id }}</p>
+                <p class="text-sm text-slate-600 mb-6">
+                    Mã đặt phòng này chưa có bản ghi trong bảng <code class="text-amber-800 bg-amber-50 px-1.5 py-0.5 rounded">invoices_by_booking</code>. Bạn có thể khởi tạo hóa đơn thanh toán ngay bên dưới:
+                </p>
+
+                <form action="{{ url_for('booking.create_invoice_route') }}" method="post" class="space-y-4 text-left bg-slate-50 p-6 rounded-2xl border border-slate-200">
+                    <input type="hidden" name="booking_id" value="{{ booking_id }}">
+
+                    <div>
+                        <label for="inv-guest-name" class="block text-xs font-semibold text-slate-700">Tên khách hàng</label>
+                        <input id="inv-guest-name" name="guest_name" type="text" placeholder="Nguyễn Văn A" class="mt-1 min-h-10 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none focus-visible:border-amber-600">
+                    </div>
+
+                    <div>
+                        <label for="inv-hotel-id" class="block text-xs font-semibold text-slate-700">Mã khách sạn</label>
+                        <input id="inv-hotel-id" name="hotel_id" type="text" placeholder="MT_001" class="mt-1 min-h-10 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none focus-visible:border-amber-600">
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label for="inv-total-amount" class="block text-xs font-semibold text-slate-700">Tổng số tiền (VNĐ)</label>
+                            <input id="inv-total-amount" name="total_amount" type="number" value="2500000" class="mt-1 min-h-10 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none focus-visible:border-amber-600">
+                        </div>
+                        <div>
+                            <label for="inv-payment-method" class="block text-xs font-semibold text-slate-700">Phương thức</label>
+                            <select id="inv-payment-method" name="payment_method" class="mt-1 min-h-10 w-full rounded-lg border border-slate-300 px-2.5 py-2 text-sm text-slate-900 outline-none focus-visible:border-amber-600">
+                                <option value="TIỀN MẶT">Tiền mặt</option>
+                                <option value="THẺ TÍN DỤNG">Thẻ tín dụng</option>
+                                <option value="CHUYỂN KHOẢN">Chuyển khoản</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <input type="hidden" name="payment_status" value="PAID">
+
+                    <button type="submit" class="w-full inline-flex min-h-11 cursor-pointer items-center justify-center rounded-xl bg-amber-600 px-4 py-2.5 font-semibold text-white shadow-sm hover:bg-amber-700 transition">
+                        Khởi tạo hóa đơn (Query Q4)
+                    </button>
+                </form>
+            </div>
+        {% endif %}
 
     {% else %}
-        <!-- CHƯA CÓ HÓA ĐƠN CHO BOOKING NÀY: FORM TẠO BỔ SUNG NHANH -->
-        <div class="rounded-3xl border-2 border-dashed border-amber-200 bg-amber-50/50 p-8 sm:p-10 text-center">
-            <div class="w-14 h-14 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center mx-auto mb-4 text-2xl shadow-inner">
-                <i class="bi bi-receipt-cutoff"></i>
+        <!-- ============================================================== -->
+        <!-- CHẾ ĐỘ XEM DANH SÁCH TOÀN BỘ HÓA ĐƠN (LIST VIEW - MỚI CẢI TIẾN)  -->
+        <!-- ============================================================== -->
+        <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4 pb-2">
+            <div>
+                <h1 id="invoice-heading" class="text-2xl sm:text-3xl font-extrabold text-slate-950">
+                    Danh Sách Hóa Đơn Thanh Toán
+                </h1>
+                <p class="mt-1 text-sm text-slate-600">
+                    Bảng kê chứng từ thanh toán đầy đủ, gồm tên người đặt, ngày nhận phòng và ngày trả phòng.
+                </p>
             </div>
-            <h2 class="text-xl font-bold text-slate-900 mb-1">Chưa có hóa đơn cho mã đặt phòng</h2>
-            <p class="text-sm font-mono text-amber-800 font-semibold mb-3">{{ booking_id }}</p>
-            <p class="text-sm text-slate-600 max-w-md mx-auto mb-6">
-                Mã đặt phòng này chưa có bản ghi trong bảng <code class="text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded">invoices_by_booking</code>. Bạn có thể khởi tạo hóa đơn thanh toán ngay bên dưới:
-            </p>
+            <div class="inline-flex w-fit items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm">
+                <span class="h-2.5 w-2.5 rounded-full bg-emerald-500" aria-hidden="true"></span>
+                {{ invoices|length }} hóa đơn {% if total_invoices_count and invoices|length != total_invoices_count %}(trên tổng số {{ total_invoices_count }}){% endif %}
+            </div>
+        </div>
 
-            <form action="{{ url_for('booking.create_invoice_route') }}" method="post" class="max-w-md mx-auto space-y-4 text-left bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-                <input type="hidden" name="booking_id" value="{{ booking_id }}">
-
-                <div>
-                    <label for="inv-guest-name" class="block text-xs font-semibold text-slate-700">Tên khách hàng</label>
-                    <input id="inv-guest-name" name="guest_name" type="text" placeholder="Nguyễn Văn A" class="mt-1 min-h-10 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none focus-visible:border-amber-600">
-                </div>
-
-                <div>
-                    <label for="inv-hotel-id" class="block text-xs font-semibold text-slate-700">Mã khách sạn</label>
-                    <input id="inv-hotel-id" name="hotel_id" type="text" placeholder="H001" class="mt-1 min-h-10 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none focus-visible:border-amber-600">
-                </div>
-
-                <div class="grid grid-cols-2 gap-3">
+        <!-- BỘ LỌC TÌM KIẾM NHANH HÓA ĐƠN -->
+        <div class="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 shadow-sm">
+            <form action="{{ url_for('booking.list_invoices') }}" method="get" class="space-y-3">
+                <div class="grid grid-cols-1 md:grid-cols-[1fr_220px_200px_auto] gap-3 items-end">
+                    <!-- Ô tìm kiếm từ khóa -->
                     <div>
-                        <label for="inv-total-amount" class="block text-xs font-semibold text-slate-700">Tổng số tiền (VNĐ)</label>
-                        <input id="inv-total-amount" name="total_amount" type="number" value="2500000" class="mt-1 min-h-10 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none focus-visible:border-amber-600">
+                        <label for="search-input" class="block text-xs font-semibold text-slate-700 mb-1">Tìm kiếm hóa đơn</label>
+                        <input id="search-input" name="q" type="text" value="{{ q or '' }}" placeholder="Nhập tên khách hàng, mã HĐ (INV...), mã Booking (BK...), số phòng..." class="min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-sm text-slate-900 outline-none transition focus-visible:border-amber-600 focus-visible:ring-2 focus-visible:ring-amber-200">
                     </div>
+
+                    <!-- Lọc theo trạng thái -->
                     <div>
-                        <label for="inv-payment-method" class="block text-xs font-semibold text-slate-700">Phương thức</label>
-                        <select id="inv-payment-method" name="payment_method" class="mt-1 min-h-10 w-full rounded-lg border border-slate-300 px-2.5 py-2 text-sm text-slate-900 outline-none focus-visible:border-amber-600">
-                            <option value="TIỀN MẶT">Tiền mặt</option>
-                            <option value="THẺ TÍN DỤNG">Thẻ tín dụng</option>
-                            <option value="CHUYỂN KHOẢN">Chuyển khoản</option>
+                        <label for="status-filter" class="block text-xs font-semibold text-slate-700 mb-1">Trạng thái thanh toán</label>
+                        <select id="status-filter" name="status" class="min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus-visible:border-amber-600">
+                            <option value="ALL" {% if not status_filter or status_filter == 'ALL' %}selected{% endif %}>Tất cả trạng thái</option>
+                            <option value="PAID" {% if status_filter == 'PAID' %}selected{% endif %}>Đã thanh toán (PAID)</option>
+                            <option value="PARTIAL" {% if status_filter == 'PARTIAL' %}selected{% endif %}>Đã đặt cọc (PARTIAL)</option>
+                            <option value="UNPAID" {% if status_filter == 'UNPAID' %}selected{% endif %}>Chờ thanh toán (UNPAID)</option>
                         </select>
                     </div>
+
+                    <!-- Lọc theo chi nhánh -->
+                    <div>
+                        <label for="hotel-filter" class="block text-xs font-semibold text-slate-700 mb-1">Chi nhánh</label>
+                        <select id="hotel-filter" name="hotel_id" class="min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus-visible:border-amber-600">
+                            <option value="ALL">Tất cả chi nhánh</option>
+                            {% for h in hotels %}
+                                {% set hid = h.hotel_id if h.hotel_id is defined else h['hotel_id'] %}
+                                {% set hname = h.name if h.name is defined else h['name'] %}
+                                <option value="{{ hid }}" {% if hotel_filter == hid %}selected{% endif %}>{{ hname }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Nút Lọc & Reset -->
+                    <div class="flex items-center gap-2">
+                        <button type="submit" class="inline-flex min-h-11 cursor-pointer items-center justify-center rounded-xl bg-amber-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-amber-700 transition">
+                            Lọc
+                        </button>
+                        {% if q or (status_filter and status_filter != 'ALL') or (hotel_filter and hotel_filter != 'ALL') %}
+                            <a href="{{ url_for('booking.list_invoices') }}" class="inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-100 transition">
+                                Đặt lại
+                            </a>
+                        {% endif %}
+                    </div>
                 </div>
-
-                <input type="hidden" name="payment_status" value="PAID">
-
-                <button type="submit" class="w-full inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl bg-amber-600 px-4 py-2.5 font-semibold text-white shadow-sm hover:bg-amber-700 transition">
-                    <i class="bi bi-file-earmark-plus"></i> Khởi tạo hóa đơn (Query Q4)
-                </button>
             </form>
         </div>
+
+        <!-- BẢNG DANH SÁCH TOÀN BỘ HÓA ĐƠN (RICH TABLE) -->
+        <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <div class="border-b border-slate-200 px-5 py-4 flex items-center justify-between">
+                <div>
+                    <h2 class="font-bold text-slate-950 text-base">
+                        Bảng kê Hóa đơn Dịch vụ
+                    </h2>
+                    <p class="text-xs text-slate-500 mt-0.5">
+                        Bấm vào bất kỳ dòng nào hoặc nút <strong class="text-amber-700 font-semibold">Xem chi tiết</strong> để mở phiếu hóa đơn, in ấn và thu nốt tiền cọc.
+                    </p>
+                </div>
+            </div>
+
+            {% if invoices %}
+                <div class="overflow-x-auto">
+                    <table class="w-full min-w-[880px] text-left text-sm" id="invoices-table">
+                        <thead class="bg-slate-50 text-xs uppercase tracking-wider text-slate-500 font-semibold border-b border-slate-200">
+                            <tr>
+                                <th scope="col" class="px-5 py-3.5">Mã Hóa Đơn</th>
+                                <th scope="col" class="px-5 py-3.5">Người đặt (Khách hàng)</th>
+                                <th scope="col" class="px-5 py-3.5">Thời gian lưu trú (Nhận &rarr; Trả)</th>
+                                <th scope="col" class="px-5 py-3.5">Chi nhánh & Phòng</th>
+                                <th scope="col" class="px-5 py-3.5">Ngày phát hành</th>
+                                <th scope="col" class="px-5 py-3.5 text-right">Tổng tiền & Tiến độ cọc</th>
+                                <th scope="col" class="px-5 py-3.5 text-center">Trạng thái</th>
+                                <th scope="col" class="px-5 py-3.5 text-right">Thao tác</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            {% for inv in invoices %}
+                                {% set inv_id = inv.invoice_id or '' %}
+                                {% set b_id = inv.booking_id or '' %}
+                                {% set g_name = inv.guest_name or 'Khách vãng lai' %}
+                                {% set g_phone = inv.guest_phone or '' %}
+                                {% set g_id_card = inv.guest_id_card or '' %}
+                                {% set h_id = inv.hotel_id or '' %}
+                                {% set h_name = inv.hotel_name or h_id %}
+                                {% set h_addr = inv.hotel_address or '' %}
+                                {% set r_num = inv.room_number or '' %}
+                                {% set c_in = inv.check_in_date or '' %}
+                                {% set c_out = inv.check_out_date or '' %}
+                                {% set nights = inv.nights or 1 %}
+                                {% set issue_d = inv.issue_date or '' %}
+                                {% set pay_m = inv.payment_method or 'TIỀN MẶT' %}
+                                {% set pay_s = (inv.payment_status or 'PAID')|upper %}
+                                {% set total_amt = inv.total_amount or 0 %}
+                                {% set dep_amt = inv.deposit_amount if inv.deposit_amount is defined else (total_amt if pay_s == 'PAID' else (total_amt/2 if pay_s == 'PARTIAL' else 0)) %}
+                                {% set rem_amt = inv.remaining_amount if inv.remaining_amount is defined else (0 if pay_s == 'PAID' else (total_amt - dep_amt)) %}
+
+                                <tr class="align-middle transition hover:bg-amber-50/40 cursor-pointer invoice-row"
+                                    data-invoice-id="{{ inv_id }}"
+                                    data-booking-id="{{ b_id }}"
+                                    data-guest-name="{{ g_name }}"
+                                    data-guest-phone="{{ g_phone }}"
+                                    data-guest-id-card="{{ g_id_card }}"
+                                    data-hotel-id="{{ h_id }}"
+                                    data-hotel-name="{{ h_name }}"
+                                    data-hotel-address="{{ h_addr }}"
+                                    data-room-number="{{ r_num }}"
+                                    data-check-in="{{ c_in }}"
+                                    data-check-out="{{ c_out }}"
+                                    data-nights="{{ nights }}"
+                                    data-issue-date="{{ issue_d }}"
+                                    data-payment-method="{{ pay_m }}"
+                                    data-payment-status="{{ pay_s }}"
+                                    data-total-amount="{{ total_amt }}"
+                                    data-deposit-amount="{{ dep_amt }}"
+                                    data-remaining-amount="{{ rem_amt }}"
+                                    onclick="onInvoiceRowClick(this)">
+                                    
+                                    <!-- Cột 1: Mã HĐ & Booking ID -->
+                                    <td class="px-5 py-4">
+                                        <div class="font-mono font-bold text-amber-900">
+                                            <span class="inline-flex items-center px-2 py-0.5 rounded-md bg-amber-100 text-amber-900 text-xs">
+                                                {{ inv_id }}
+                                            </span>
+                                        </div>
+                                        <div class="text-[11px] font-mono text-slate-500 mt-1">
+                                            Booking: <strong class="text-slate-700">{{ b_id }}</strong>
+                                        </div>
+                                    </td>
+
+                                    <!-- Cột 2: Khách hàng (Tên người đặt) -->
+                                    <td class="px-5 py-4">
+                                        <div class="font-semibold text-slate-900 text-sm">
+                                            {{ g_name }}
+                                        </div>
+                                        {% if g_phone or g_id_card %}
+                                            <div class="text-xs text-slate-500 mt-0.5">
+                                                {% if g_phone %}<span>{{ g_phone }}</span>{% endif %}
+                                                {% if g_phone and g_id_card %} · {% endif %}
+                                                {% if g_id_card %}<span class="font-mono">{{ g_id_card }}</span>{% endif %}
+                                            </div>
+                                        {% endif %}
+                                    </td>
+
+                                    <!-- Cột 3: Thời gian lưu trú (Ngày nhận phòng & Ngày trả phòng) -->
+                                    <td class="px-5 py-4 whitespace-nowrap">
+                                        {% if c_in and c_out %}
+                                            <div class="font-medium text-slate-800 text-xs sm:text-sm">
+                                                <span class="text-slate-900 font-semibold">{{ c_in }}</span>
+                                                <span class="text-slate-400 mx-1">&rarr;</span>
+                                                <span class="text-slate-900 font-semibold">{{ c_out }}</span>
+                                            </div>
+                                            <div class="text-[11px] text-amber-800 font-medium mt-0.5">
+                                                Thời lượng: {{ nights }} đêm lưu trú
+                                            </div>
+                                        {% else %}
+                                            <span class="text-xs text-slate-400 italic">Đang cập nhật lịch</span>
+                                        {% endif %}
+                                    </td>
+
+                                    <!-- Cột 4: Chi nhánh & Phòng -->
+                                    <td class="px-5 py-4">
+                                        <div class="font-medium text-slate-900 text-xs sm:text-sm max-w-[360px] 2xl:max-w-none truncate" title="{{ h_name }}">
+                                            {{ h_name }}
+                                        </div>
+                                        <div class="text-xs text-slate-500 mt-0.5">
+                                            {% if r_num %}
+                                                Phòng: <strong class="text-slate-800 font-semibold">{{ r_num }}</strong>
+                                            {% else %}
+                                                Chi nhánh: <span class="font-mono">{{ h_id }}</span>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+
+                                    <!-- Cột 5: Ngày phát hành -->
+                                    <td class="px-5 py-4 text-xs font-mono text-slate-600 whitespace-nowrap">
+                                        {{ issue_d }}
+                                    </td>
+
+                                    <!-- Cột 6: Tổng tiền & Tiến độ cọc -->
+                                    <td class="px-5 py-4 text-right whitespace-nowrap">
+                                        <span class="font-mono font-bold text-slate-950 text-sm sm:text-base">
+                                            {{ "{:,.0f}".format(total_amt|float) }} đ
+                                        </span>
+                                        {% if pay_s == 'PARTIAL' %}
+                                            <div class="text-[11px] font-semibold text-blue-700 mt-0.5">
+                                                Đã cọc: {{ "{:,.0f}".format(dep_amt|float) }} đ
+                                            </div>
+                                            <div class="text-[11px] font-bold text-red-600">
+                                                Còn thiếu: {{ "{:,.0f}".format(rem_amt|float) }} đ
+                                            </div>
+                                        {% elif pay_s == 'UNPAID' %}
+                                            <div class="text-[11px] font-semibold text-amber-700 mt-0.5">
+                                                Chưa thanh toán (0%)
+                                            </div>
+                                        {% else %}
+                                            <div class="text-[11px] text-emerald-700 font-medium mt-0.5">
+                                                {{ pay_m }} · Đủ 100%
+                                            </div>
+                                        {% endif %}
+                                    </td>
+
+                                    <!-- Cột 7: Trạng thái thanh toán -->
+                                    <td class="px-5 py-4 text-center whitespace-nowrap">
+                                        {% if pay_s == 'PAID' %}
+                                            <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-300">
+                                                Đã Thanh Toán
+                                            </span>
+                                        {% elif pay_s == 'PARTIAL' %}
+                                            <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-blue-100 text-blue-800 border border-blue-300">
+                                                Đã Đặt Cọc
+                                            </span>
+                                        {% else %}
+                                            <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-amber-100 text-amber-800 border border-amber-300">
+                                                Chờ Thanh Toán
+                                            </span>
+                                        {% endif %}
+                                    </td>
+
+                                    <!-- Cột 8: Thao tác -->
+                                    <td class="px-5 py-4 text-right whitespace-nowrap" onclick="event.stopPropagation()">
+                                        <div class="flex items-center justify-end gap-1.5">
+                                            {% if rem_amt > 0 %}
+                                                <button type="button" onclick="openInvoiceModalFromRow(this.closest('tr'), true)" title="Xác nhận thu nốt số tiền còn lại" class="inline-flex items-center justify-center rounded-lg bg-emerald-600 px-2.5 py-1.5 text-xs font-bold text-white hover:bg-emerald-700 shadow-2xs transition cursor-pointer">
+                                                    Thu nốt
+                                                </button>
+                                            {% endif %}
+                                            <button type="button" onclick="openInvoiceModalFromRow(this.closest('tr'))" class="inline-flex items-center justify-center rounded-lg bg-amber-50 px-2.5 py-1.5 text-xs font-semibold text-amber-800 hover:bg-amber-100 border border-amber-200 transition cursor-pointer">
+                                                Chi tiết
+                                            </button>
+                                            <a href="{{ url_for('booking.view_invoice', booking_id=b_id) }}" title="Mở phiếu in" class="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition">
+                                                In
+                                            </a>
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="p-10 text-center text-slate-500 space-y-2">
+                    <p class="text-base font-semibold text-slate-700">Không tìm thấy hóa đơn nào phù hợp với bộ lọc.</p>
+                    <p class="text-xs text-slate-500">Vui lòng thử tìm với từ khóa khác hoặc bấm nút "Đặt lại" bên trên.</p>
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- ============================================================== -->
+        <!-- INTERACTIVE MODAL: PHIẾU HÓA ĐƠN CHI TIẾT TỨC THÌ (POPUP)        -->
+        <!-- ============================================================== -->
+        <div id="invoice-modal-backdrop" class="fixed inset-0 z-50 hidden bg-slate-950/70 backdrop-blur-sm transition-opacity overflow-y-auto p-4 sm:p-6 flex items-center justify-center" onclick="closeInvoiceModalOnBackdrop(event)">
+            <div id="invoice-modal-card" class="bg-white rounded-3xl border border-slate-200 shadow-2xl overflow-hidden max-w-3xl w-full my-8 transform transition-all text-slate-800" onclick="event.stopPropagation()">
+                
+                <!-- HEADER MODAL PHIẾU -->
+                <div class="bg-gradient-to-r from-slate-900 via-slate-800 to-amber-950 p-6 sm:p-7 text-white relative">
+                    <button type="button" onclick="closeInvoiceModal()" class="absolute top-5 right-5 text-slate-400 hover:text-white bg-slate-800/60 hover:bg-slate-700 px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer">
+                        Đóng [ESC]
+                    </button>
+                    <div class="flex items-center gap-2">
+                        <span class="text-lg sm:text-xl font-black tracking-tight">MƯỜNG THANH HOSPITALITY</span>
+                    </div>
+                    <p class="text-xs text-amber-200/90 mt-1 uppercase tracking-wider font-semibold">
+                        Phiếu Hóa Đơn Dịch Vụ Lưu Trú Khách Sạn
+                    </p>
+                    <div class="flex flex-wrap items-center justify-between gap-3 mt-4 pt-3 border-t border-slate-700/60">
+                        <div class="text-xs text-slate-300 font-mono">
+                            Mã HĐ: <strong id="modal-inv-id" class="text-white font-bold text-sm">---</strong>
+                        </div>
+                        <div id="modal-inv-badge">
+                            <!-- Badge thanh toán -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- BODY MODAL -->
+                <div class="p-6 sm:p-8 space-y-6">
+                    <!-- 2 CỘT THÔNG TIN -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 pb-6 border-b border-slate-100 text-sm">
+                        <div class="space-y-1.5">
+                            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Thông tin khách hàng & Lưu trú</h3>
+                            <p class="text-slate-500">Khách hàng: <strong id="modal-guest-name" class="text-slate-950 text-base font-bold">---</strong></p>
+                            <p id="modal-guest-phone-wrapper" class="text-slate-500">Số điện thoại: <strong id="modal-guest-phone" class="text-slate-800">---</strong></p>
+                            <p id="modal-guest-card-wrapper" class="text-slate-500">CCCD / Hộ chiếu: <span id="modal-guest-card" class="font-mono font-medium text-slate-800">---</span></p>
+                            <p class="text-slate-500">Cơ sở lưu trú: <strong id="modal-hotel-name" class="text-slate-800">---</strong></p>
+                            <p class="text-slate-500">Số phòng: <strong id="modal-room-number" class="text-amber-800 font-bold bg-amber-50 px-2 py-0.5 rounded">---</strong></p>
+                        </div>
+                        <div class="space-y-1.5 sm:text-right">
+                            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Thông tin chứng từ & Kỳ nghỉ</h3>
+                            <p class="text-slate-500">Mã đặt phòng: <span id="modal-booking-id" class="font-mono font-bold text-amber-900 bg-amber-100/70 px-2 py-0.5 rounded">---</span></p>
+                            <p class="text-slate-500">Thời gian nhận phòng: <strong id="modal-check-in" class="text-slate-900">---</strong></p>
+                            <p class="text-slate-500">Thời gian trả phòng: <strong id="modal-check-out" class="text-slate-900">---</strong></p>
+                            <p class="text-slate-500">Số đêm lưu trú: <strong id="modal-nights" class="text-slate-900">1 đêm</strong></p>
+                            <p class="text-slate-500">Ngày phát hành HĐ: <span id="modal-issue-date" class="font-mono text-slate-700">---</span></p>
+                            <p class="text-slate-500">Phương thức: <span id="modal-payment-method" class="font-semibold text-slate-800">---</span></p>
+                        </div>
+                    </div>
+
+                    <!-- BẢNG BÓC TÁCH THANH TOÁN -->
+                    <div>
+                        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">Chi tiết dịch vụ</h3>
+                        <div class="overflow-hidden rounded-xl border border-slate-200">
+                            <table class="w-full text-left text-sm">
+                                <thead class="bg-slate-50 text-xs uppercase tracking-wider text-slate-500 border-b border-slate-200">
+                                    <tr>
+                                        <th scope="col" class="px-4 py-3 font-semibold">STT</th>
+                                        <th scope="col" class="px-4 py-3 font-semibold">Dịch vụ</th>
+                                        <th scope="col" class="px-4 py-3 text-center font-semibold">Thời lượng</th>
+                                        <th scope="col" class="px-4 py-3 text-right font-semibold">Đơn giá / đêm</th>
+                                        <th scope="col" class="px-4 py-3 text-right font-semibold">Thành tiền</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-100">
+                                    <tr>
+                                        <td class="px-4 py-3 text-slate-500">1</td>
+                                        <td class="px-4 py-3 font-medium text-slate-900">
+                                            Dịch vụ lưu trú phòng khách sạn
+                                            <p class="text-xs text-slate-400 mt-0.5">Tiện ích trọn gói tiêu chuẩn Mường Thanh Hospitality</p>
+                                        </td>
+                                        <td id="modal-table-nights" class="px-4 py-3 text-center text-slate-600">1 đêm</td>
+                                        <td id="modal-table-unit-price" class="px-4 py-3 text-right font-mono text-slate-700">---</td>
+                                        <td id="modal-table-total" class="px-4 py-3 text-right font-mono font-bold text-slate-900">---</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- TỔNG TIỀN THANH TOÁN & THẺ TIẾN ĐỘ CỌC -->
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 p-4 rounded-2xl bg-slate-50 border border-slate-200 text-sm">
+                        <div class="p-3 bg-white rounded-xl border border-slate-200">
+                            <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-1">Tổng tiền hóa đơn</span>
+                            <span id="modal-sum-total" class="font-mono font-extrabold text-slate-900 text-lg sm:text-xl">---</span>
+                        </div>
+                        <div class="p-3 bg-emerald-50/60 rounded-xl border border-emerald-200">
+                            <span class="text-xs font-semibold text-emerald-800 uppercase tracking-wider block mb-1">Đã cọc / Đã trả</span>
+                            <span id="modal-sum-deposit" class="font-mono font-extrabold text-emerald-700 text-lg sm:text-xl">---</span>
+                        </div>
+                        <div id="modal-remaining-box" class="p-3 bg-amber-50/70 rounded-xl border border-amber-200">
+                            <span class="text-xs font-semibold text-amber-800 uppercase tracking-wider block mb-1">Còn thiếu cần thu</span>
+                            <span id="modal-sum-remaining" class="font-mono font-extrabold text-amber-900 text-lg sm:text-xl">---</span>
+                        </div>
+                    </div>
+
+                    <!-- KHỐI HÀNH ĐỘNG DÀNH CHO LỄ TÂN: THU NỐT TIỀN CÒN LẠI (TRONG MODAL) -->
+                    <div id="modal-settle-panel" class="hidden p-4 rounded-2xl bg-amber-50 border border-amber-300">
+                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                            <div>
+                                <h4 class="text-sm font-bold text-slate-900 flex items-center gap-1.5">
+                                    <span class="text-base">💳</span> Xác nhận thu tiền còn lại: <span id="modal-settle-amount-text" class="text-red-600 font-mono font-extrabold">---</span>
+                                </h4>
+                                <p class="text-xs text-slate-600 mt-0.5">
+                                    Sau khi khách thanh toán nốt khi nhận/trả phòng, bấm nút bên dưới để chuyển sang trạng thái ĐÃ THANH TOÁN.
+                                </p>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <select id="modal-settle-method" class="min-h-10 rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-800 outline-none focus-visible:border-amber-600">
+                                    <option value="TIỀN MẶT">Tiền mặt</option>
+                                    <option value="CHUYỂN KHOẢN">Chuyển khoản</option>
+                                    <option value="THẺ TÍN DỤNG">Thẻ tín dụng</option>
+                                </select>
+                                <button type="button" id="modal-btn-settle" onclick="submitModalSettle()" class="inline-flex min-h-10 items-center justify-center rounded-xl bg-emerald-600 hover:bg-emerald-700 px-4 py-2 text-xs font-bold text-white shadow-sm transition cursor-pointer">
+                                    Xác nhận đã thu
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TỔNG TIỀN PHIẾU -->
+                    <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4 pt-2 border-t border-slate-200">
+                        <div class="text-xs text-slate-400 max-w-xs">
+                            Chứng từ điện tử hợp lệ lưu trữ phân tán an toàn trên CSDL AstraDB Cloud (Apache Cassandra Query Q4).
+                        </div>
+                        <div class="space-y-1 sm:text-right min-w-[220px]">
+                            <div class="flex justify-between sm:justify-end gap-6 text-sm text-slate-500">
+                                <span>Tạm tính:</span>
+                                <span id="modal-subtotal" class="font-mono font-medium text-slate-800">---</span>
+                            </div>
+                            <div class="flex justify-between sm:justify-end gap-6 text-sm text-slate-500">
+                                <span>Thuế VAT (0%):</span>
+                                <span class="font-mono text-slate-800">0 đ</span>
+                            </div>
+                            <div class="flex justify-between sm:justify-end gap-6 text-base sm:text-lg font-black text-amber-900 pt-2 border-t border-slate-200">
+                                <span>TỔNG CỘNG:</span>
+                                <span id="modal-grand-total" class="font-mono text-amber-700 text-xl">---</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- FOOTER ACTIONS -->
+                    <div class="pt-6 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <p class="text-xs text-slate-400">Mường Thanh Hospitality · Cảm ơn quý khách!</p>
+                        <div class="flex items-center gap-2">
+                            <a id="modal-link-print-page" href="#" target="_blank" class="inline-flex min-h-10 items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition">
+                                Mở trang in độc lập
+                            </a>
+                            <button type="button" onclick="printModalInvoice()" class="inline-flex min-h-10 items-center justify-center rounded-xl bg-amber-600 px-5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-amber-700 transition cursor-pointer">
+                                In hóa đơn
+                            </button>
+                            <button type="button" onclick="closeInvoiceModal()" class="inline-flex min-h-10 items-center justify-center rounded-xl border border-slate-200 bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-200 transition cursor-pointer">
+                                Đóng
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- JAVASCRIPT ĐIỀU KHIỂN MODAL XEM CHI TIẾT TỨC THÌ -->
+        <script>
+            var _activeRowEl = null;
+
+            function formatVND(amount) {
+                try {
+                    var num = parseFloat(amount) || 0;
+                    return num.toLocaleString('vi-VN') + ' đ';
+                } catch(e) {
+                    return amount + ' đ';
+                }
+            }
+
+            function onInvoiceRowClick(row) {
+                openInvoiceModalFromRow(row, false);
+            }
+
+            function openInvoiceModalFromRow(row, autoFocusSettle) {
+                if (!row) return;
+                _activeRowEl = row;
+
+                var invId = row.getAttribute('data-invoice-id') || '';
+                var bId = row.getAttribute('data-booking-id') || '';
+                var gName = row.getAttribute('data-guest-name') || 'Khách vãng lai';
+                var gPhone = row.getAttribute('data-guest-phone') || '';
+                var gCard = row.getAttribute('data-guest-id-card') || '';
+                var hName = row.getAttribute('data-hotel-name') || '';
+                var rNum = row.getAttribute('data-room-number') || '';
+                var cIn = row.getAttribute('data-check-in') || 'Chưa xác định';
+                var cOut = row.getAttribute('data-check-out') || 'Chưa xác định';
+                var nights = parseInt(row.getAttribute('data-nights') || '1', 10) || 1;
+                var issueDate = row.getAttribute('data-issue-date') || '';
+                var payMethod = row.getAttribute('data-payment-method') || 'TIỀN MẶT';
+                var payStatus = (row.getAttribute('data-payment-status') || 'PAID').toUpperCase();
+                var totalAmt = parseFloat(row.getAttribute('data-total-amount') || '0') || 0;
+                var depAmt = parseFloat(row.getAttribute('data-deposit-amount') || '0');
+                var remAmt = parseFloat(row.getAttribute('data-remaining-amount') || '0');
+
+                // Nếu chưa có thuộc tính hoặc là 0 nhưng trạng thái PAID
+                if (payStatus === 'PAID') {
+                    depAmt = totalAmt;
+                    remAmt = 0;
+                }
+
+                // Điền dữ liệu vào Modal
+                document.getElementById('modal-inv-id').textContent = invId;
+                document.getElementById('modal-booking-id').textContent = bId;
+                document.getElementById('modal-guest-name').textContent = gName;
+                document.getElementById('modal-hotel-name').textContent = hName;
+                document.getElementById('modal-room-number').textContent = rNum ? ('Phòng ' + rNum) : 'Phòng tiêu chuẩn';
+                document.getElementById('modal-check-in').textContent = cIn;
+                document.getElementById('modal-check-out').textContent = cOut;
+                document.getElementById('modal-nights').textContent = nights + ' đêm lưu trú';
+                document.getElementById('modal-table-nights').textContent = nights + ' đêm';
+                document.getElementById('modal-issue-date').textContent = issueDate;
+                document.getElementById('modal-payment-method').textContent = payMethod;
+
+                // Số điện thoại & CCCD
+                var phoneEl = document.getElementById('modal-guest-phone');
+                if (gPhone) {
+                    phoneEl.textContent = gPhone;
+                    document.getElementById('modal-guest-phone-wrapper').style.display = 'block';
+                } else {
+                    document.getElementById('modal-guest-phone-wrapper').style.display = 'none';
+                }
+
+                var cardEl = document.getElementById('modal-guest-card');
+                if (gCard) {
+                    cardEl.textContent = gCard;
+                    document.getElementById('modal-guest-card-wrapper').style.display = 'block';
+                } else {
+                    document.getElementById('modal-guest-card-wrapper').style.display = 'none';
+                }
+
+                // Tiền & Đơn giá
+                var unitPrice = nights > 0 ? (totalAmt / nights) : totalAmt;
+                document.getElementById('modal-table-unit-price').textContent = formatVND(unitPrice);
+                document.getElementById('modal-table-total').textContent = formatVND(totalAmt);
+                document.getElementById('modal-subtotal').textContent = formatVND(totalAmt);
+                document.getElementById('modal-grand-total').textContent = formatVND(totalAmt);
+
+                // 3 Thẻ tóm tắt tài chính
+                document.getElementById('modal-sum-total').textContent = formatVND(totalAmt);
+                document.getElementById('modal-sum-deposit').textContent = formatVND(depAmt);
+                var remBox = document.getElementById('modal-remaining-box');
+                var remText = document.getElementById('modal-sum-remaining');
+                if (remAmt > 0) {
+                    remText.textContent = formatVND(remAmt);
+                    remBox.className = "p-3 bg-red-50 rounded-xl border border-red-200 text-red-700";
+                    remText.className = "font-mono font-extrabold text-red-600 text-lg sm:text-xl";
+                } else {
+                    remText.textContent = '0 đ (Đủ)';
+                    remBox.className = "p-3 bg-slate-50 rounded-xl border border-slate-200 text-slate-600";
+                    remText.className = "font-mono font-extrabold text-slate-800 text-lg sm:text-xl";
+                }
+
+                // Badge trạng thái
+                var badgeContainer = document.getElementById('modal-inv-badge');
+                if (payStatus === 'PAID') {
+                    badgeContainer.innerHTML = '<span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-emerald-500/25 text-emerald-300 border border-emerald-500/50">Đã Thanh Toán (100%)</span>';
+                } else if (payStatus === 'PARTIAL') {
+                    badgeContainer.innerHTML = '<span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-blue-500/25 text-blue-300 border border-blue-500/50">Đã Đặt Cọc</span>';
+                } else {
+                    badgeContainer.innerHTML = '<span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-amber-500/25 text-amber-300 border border-amber-500/50">Chờ Thanh Toán</span>';
+                }
+
+                // Panel thu tiền nốt
+                var settlePanel = document.getElementById('modal-settle-panel');
+                if (remAmt > 0) {
+                    settlePanel.classList.remove('hidden');
+                    document.getElementById('modal-settle-amount-text').textContent = formatVND(remAmt);
+                } else {
+                    settlePanel.classList.add('hidden');
+                }
+
+                // Link in độc lập
+                document.getElementById('modal-link-print-page').href = '/invoices/' + encodeURIComponent(bId);
+
+                // Hiển thị Modal
+                var modal = document.getElementById('invoice-modal-backdrop');
+                modal.classList.remove('hidden');
+                document.body.style.overflow = 'hidden';
+
+                if (autoFocusSettle && remAmt > 0) {
+                    settlePanel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            }
+
+            function submitModalSettle() {
+                if (!_activeRowEl) return;
+                var bId = _activeRowEl.getAttribute('data-booking-id') || '';
+                var method = document.getElementById('modal-settle-method').value || 'TIỀN MẶT';
+                var btn = document.getElementById('modal-btn-settle');
+
+                btn.disabled = true;
+                btn.textContent = 'Đang xử lý...';
+
+                var formData = new FormData();
+                formData.append('payment_method', method);
+
+                fetch('/api/invoices/' + encodeURIComponent(bId) + '/settle', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(function(res) { return res.json(); })
+                .then(function(result) {
+                    btn.disabled = false;
+                    btn.textContent = 'Xác nhận đã thu';
+
+                    if (result.success) {
+                        // Cập nhật giao diện Modal
+                        document.getElementById('modal-inv-badge').innerHTML = '<span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-emerald-500/25 text-emerald-300 border border-emerald-500/50">Đã Thanh Toán (100%)</span>';
+                        var totalAmt = parseFloat(_activeRowEl.getAttribute('data-total-amount') || '0');
+                        document.getElementById('modal-sum-deposit').textContent = formatVND(totalAmt);
+                        document.getElementById('modal-sum-remaining').textContent = '0 đ (Đã đủ)';
+                        document.getElementById('modal-settle-panel').classList.add('hidden');
+
+                        // Cập nhật dòng tr trên bảng danh sách
+                        _activeRowEl.setAttribute('data-payment-status', 'PAID');
+                        _activeRowEl.setAttribute('data-deposit-amount', totalAmt);
+                        _activeRowEl.setAttribute('data-remaining-amount', '0');
+
+                        // Cập nhật cột Trạng thái trên tr
+                        var statusCell = _activeRowEl.cells[6];
+                        if (statusCell) {
+                            statusCell.innerHTML = '<span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-300">Đã Thanh Toán</span>';
+                        }
+                        // Cập nhật cột Tiền trên tr
+                        var amountCell = _activeRowEl.cells[5];
+                        if (amountCell) {
+                            amountCell.innerHTML = '<span class="font-mono font-bold text-slate-950 text-sm sm:text-base">' + formatVND(totalAmt) + '</span><div class="text-[11px] text-emerald-700 font-medium mt-0.5">' + method + ' · Đủ 100%</div>';
+                        }
+                        // Ẩn nút Thu nốt trên cột Thao tác
+                        var actionCell = _activeRowEl.cells[7];
+                        if (actionCell) {
+                            var thuNotBtn = actionCell.querySelector('button[title*="thu nốt"]');
+                            if (thuNotBtn) thuNotBtn.remove();
+                        }
+
+                        alert("Thành công: " + result.message);
+                    } else {
+                        alert("Thao tác thất bại: " + (result.message || 'Không rõ nguyên nhân'));
+                    }
+                })
+                .catch(function(err) {
+                    btn.disabled = false;
+                    btn.textContent = 'Xác nhận đã thu';
+                    alert("Lỗi kết nối máy chủ: " + err);
+                });
+            }
+
+            function closeInvoiceModal() {
+                var modal = document.getElementById('invoice-modal-backdrop');
+                modal.classList.add('hidden');
+                document.body.style.overflow = '';
+            }
+
+            function closeInvoiceModalOnBackdrop(event) {
+                if (event.target.id === 'invoice-modal-backdrop') {
+                    closeInvoiceModal();
+                }
+            }
+
+            function printModalInvoice() {
+                window.print();
+            }
+
+            // Lắng nghe phím ESC để đóng modal
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape') {
+                    closeInvoiceModal();
+                }
+            });
+        </script>
     {% endif %}
+
 </section>
 {% endblock %}
