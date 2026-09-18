@@ -72,6 +72,14 @@ class HotelServiceAstraIntegrationTest(unittest.TestCase):
             "Không đọc lại được khách hàng vừa insert từ bảng guests",
         )
 
+    @classmethod
+    def tearDownClass(cls):
+        try:
+            hotel_service.delete_hotel("H_QLKS04_TEST")
+            hotel_service.delete_guest("G_QLKS04_TEST")
+        except Exception:
+            pass
+
 
 if __name__ == "__main__":
     unittest.main()

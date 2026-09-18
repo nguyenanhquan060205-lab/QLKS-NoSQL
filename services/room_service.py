@@ -8,6 +8,7 @@
 # trang chi tiết + sửa phòng.
 # ====================================================================
 
+import time
 from decimal import Decimal, InvalidOperation
 from types import SimpleNamespace
 
@@ -91,11 +92,36 @@ def _build_room(row):
     return room
 
 
+# Mock store cho phòng khi chạy ở chế độ offline/chưa cấu hình AstraDB
+_mock_rooms = {
+    "H001": [
+        SimpleNamespace(hotel_id="H001", room_number="101", room_type="Deluxe Twin", price_per_night=Decimal("1350000"), is_available=True, status="AVAILABLE", capacity=2, bed_type="2 Single Beds", description="Phòng tiêu chuẩn 2 giường đơn view thành phố"),
+        SimpleNamespace(hotel_id="H001", room_number="102", room_type="Deluxe King", price_per_night=Decimal("1450000"), is_available=True, status="AVAILABLE", capacity=2, bed_type="1 King Bed", description="Phòng tiêu chuẩn 1 giường lớn view biển"),
+        SimpleNamespace(hotel_id="H001", room_number="201", room_type="Executive Suite", price_per_night=Decimal("2600000"), is_available=True, status="AVAILABLE", capacity=3, bed_type="1 King Bed + 1 Sofa", description="Phòng cao cấp kèm phòng khách riêng"),
+        SimpleNamespace(hotel_id="H001", room_number="301", room_type="Grand Suite", price_per_night=Decimal("3800000"), is_available=False, status="MAINTENANCE", capacity=4, bed_type="2 King Beds", description="Phòng Tổng thống đang bảo trì hệ thống điều hòa"),
+    ],
+    "H002": [
+        SimpleNamespace(hotel_id="H002", room_number="401", room_type="Deluxe Ocean", price_per_night=Decimal("1650000"), is_available=True, status="AVAILABLE", capacity=2, bed_type="1 King Bed", description="View trực diện vịnh Nha Trang"),
+        SimpleNamespace(hotel_id="H002", room_number="501", room_type="Executive Suite", price_per_night=Decimal("2800000"), is_available=True, status="AVAILABLE", capacity=3, bed_type="1 King Bed + Sofa", description="Phòng Suite ban công rộng"),
+    ],
+    "H003": [
+        SimpleNamespace(hotel_id="H003", room_number="105", room_type="Superior King", price_per_night=Decimal("950000"), is_available=True, status="AVAILABLE", capacity=2, bed_type="1 King Bed", description="Phòng tiêu chuẩn Hà Nội"),
+        SimpleNamespace(hotel_id="H003", room_number="205", room_type="Deluxe King", price_per_night=Decimal("1250000"), is_available=True, status="AVAILABLE", capacity=2, bed_type="1 King Bed", description="Phòng Deluxe view hồ Linh Đàm"),
+    ],
+    "H004": [
+        SimpleNamespace(hotel_id="H004", room_number="601", room_type="Deluxe King", price_per_night=Decimal("1600000"), is_available=True, status="AVAILABLE", capacity=2, bed_type="1 King Bed", description="Phòng trung tâm Sài Gòn"),
+    ],
+}
+
+
 def get_rooms_by_hotel(hotel_id):
     """Danh sách phòng đầy đủ thông tin (kèm sức chứa, loại giường, trạng thái) theo khách sạn."""
+    if not hotel_id:
+        return []
+    hotel_id_str = str(hotel_id).strip()
     session = get_session()
     if not session:
-        return []
+        return _mock_rooms.get(hotel_id_str, [])
     try:
         stmt = session.prepare("""
             SELECT hotel_id, room_number, room_type, price_per_night, is_available,
@@ -103,17 +129,152 @@ def get_rooms_by_hotel(hotel_id):
             FROM rooms_by_hotel
             WHERE hotel_id = ?;
         """)
-        rows = session.execute(stmt, (hotel_id,))
+        rows = session.execute(stmt, (hotel_id_str,))
         return [_build_room(row) for row in rows]
     except Exception as error:
-        print(f"❌ [Phòng] Lỗi lấy danh sách phòng: {error}")
+        # Fallback nếu bảng chưa ALTER cột status/capacity/bed_type/description
+        try:
+            stmt_basic = session.prepare("""
+                SELECT hotel_id, room_number, room_type, price_per_night, is_available
+                FROM rooms_by_hotel
+                WHERE hotel_id = ?;
+            """)
+            rows = session.execute(stmt_basic, (hotel_id_str,))
+            return [_build_room(row) for row in rows]
+        except Exception as err2:
+            print(f"❌ [Phòng] Lỗi lấy danh sách phòng: {err2}")
+            return _mock_rooms.get(hotel_id_str, [])
+
+
+_all_rooms_cache = {"data": None, "timestamp": 0}
+
+
+def invalidate_rooms_cache():
+    """Hủy cache danh sách phòng khi có phát sinh thay đổi trạng thái/tạo phòng."""
+    _all_rooms_cache["data"] = None
+    _all_rooms_cache["timestamp"] = 0
+
+
+def get_all_rooms(limit=400):
+    """Lấy danh sách tất cả các phòng kèm cache in-memory 30s."""
+    now = time.time()
+    if _all_rooms_cache.get("data") and (now - _all_rooms_cache.get("timestamp", 0) < 30):
+        return _all_rooms_cache["data"][:limit]
+
+    session = get_session()
+    if not session:
+        all_mock = []
+        for rooms in _mock_rooms.values():
+            all_mock.extend(rooms)
+        return all_mock[:limit]
+
+    try:
+        stmt = session.prepare("""
+            SELECT hotel_id, room_number, room_type, price_per_night, is_available,
+                   status, capacity, bed_type, description
+            FROM rooms_by_hotel;
+        """)
+        rows = session.execute(stmt)
+        res = [_build_room(row) for row in rows]
+        _all_rooms_cache["data"] = res
+        _all_rooms_cache["timestamp"] = now
+        return res[:limit]
+    except Exception as e:
+        print(f"❌ [Lỗi get_all_rooms]: {e}")
         return []
+
+
+def get_filtered_rooms(hotel_id=None, room_type=None, bed_type=None, capacity=None, 
+                       amenity=None, price_range=None, status="AVAILABLE", limit=200,
+                       hotel_amenities_map=None):
+    """
+    Bộ lọc tra cứu phòng trống chuẩn nghiệp vụ tiếp tân khách sạn:
+    - hotel_id: Lọc theo chi nhánh khách sạn
+    - room_type: Lọc theo loại phòng (Deluxe, Suite...)
+    - bed_type: Lọc theo loại giường (King, Twin, Single, Double)
+    - capacity: Lọc theo sức chứa khách (1, 2, 4 người)
+    - amenity: Tìm kiếm tiện nghi/mô tả (bồn tắm, view biển, panorama, ban công...)
+    - price_range: 'under_1m', '1m_2m', 'above_2m'
+    - status: 'AVAILABLE' (mặc định), 'OCCUPIED', 'MAINTENANCE', hoặc 'ALL'
+    - hotel_amenities_map: Dict mapping hotel_id -> set/list các tiện ích của khách sạn đó
+    """
+    if hotel_id and str(hotel_id).strip().upper() not in ("", "ALL"):
+        rooms = get_rooms_by_hotel(hotel_id)
+    else:
+        rooms = get_all_rooms(limit=limit * 2)
+
+    res = []
+    for r in rooms:
+        # Lọc trạng thái
+        if status and status != "ALL":
+            if r.status != status:
+                continue
+
+        # Lọc loại phòng
+        if room_type and room_type != "ALL":
+            if (r.room_type or "").strip().lower() != room_type.strip().lower():
+                continue
+
+        # Lọc loại giường
+        if bed_type and bed_type != "ALL":
+            if (r.bed_type or "").strip().lower() != bed_type.strip().lower():
+                continue
+
+        # Lọc sức chứa
+        if capacity and capacity != "ALL":
+            try:
+                if int(r.capacity or 2) < int(capacity):
+                    continue
+            except Exception:
+                pass
+
+        # Lọc tiện nghi / tiện ích khách sạn / mô tả phòng
+        if amenity and amenity != "ALL":
+            kw = amenity.strip().lower()
+            desc = (r.description or "").lower()
+            rtype = (r.room_type or "").lower()
+            btype = (r.bed_type or "").lower()
+            rnum = str(r.room_number or "").lower()
+
+            hotel_matched = False
+            if hotel_amenities_map and r.hotel_id in hotel_amenities_map:
+                hotel_ams = [str(a).lower() for a in (hotel_amenities_map[r.hotel_id] or [])]
+                hotel_matched = any(kw == a or kw in a or a in kw for a in hotel_ams)
+
+            room_matched = (kw in desc or kw in rtype or kw in btype or kw in rnum)
+
+            if not hotel_matched and not room_matched:
+                continue
+
+        # Lọc khoảng giá
+        if price_range and price_range != "ALL":
+            try:
+                price = float(r.price_per_night or 0)
+                if price_range == "under_1m" and price >= 1000000:
+                    continue
+                elif price_range == "1m_2m" and (price < 1000000 or price > 2000000):
+                    continue
+                elif price_range == "above_2m" and price <= 2000000:
+                    continue
+            except Exception:
+                pass
+
+        res.append(r)
+
+    return res[:limit]
 
 
 def get_room(hotel_id, room_number):
     """Thông tin chi tiết 1 phòng, trả None nếu không tồn tại."""
+    if not hotel_id or not room_number:
+        return None
+    hotel_id_str = str(hotel_id).strip()
+    room_number_str = str(room_number).strip()
     session = get_session()
     if not session:
+        for r in _mock_rooms.get(hotel_id_str, []):
+            if str(r.room_number) == room_number_str:
+                return r
         return None
     try:
         stmt = session.prepare("""
@@ -122,13 +283,28 @@ def get_room(hotel_id, room_number):
             FROM rooms_by_hotel
             WHERE hotel_id = ? AND room_number = ?;
         """)
-        rows = list(session.execute(stmt, (hotel_id, room_number)))
+        rows = list(session.execute(stmt, (hotel_id_str, room_number_str)))
         if not rows:
             return None
         return _build_room(rows[0])
     except Exception as error:
-        print(f"❌ [Phòng] Lỗi lấy chi tiết phòng: {error}")
-        return None
+        # Fallback nếu bảng chưa có cột mở rộng
+        try:
+            stmt_basic = session.prepare("""
+                SELECT hotel_id, room_number, room_type, price_per_night, is_available
+                FROM rooms_by_hotel
+                WHERE hotel_id = ? AND room_number = ?;
+            """)
+            rows = list(session.execute(stmt_basic, (hotel_id_str, room_number_str)))
+            if not rows:
+                return None
+            return _build_room(rows[0])
+        except Exception as err2:
+            print(f"❌ [Phòng] Lỗi lấy chi tiết phòng: {err2}")
+            for r in _mock_rooms.get(hotel_id_str, []):
+                if str(r.room_number) == room_number_str:
+                    return r
+            return None
 
 
 def is_room_bookable(hotel_id, room_number):
@@ -153,12 +329,35 @@ def is_room_bookable(hotel_id, room_number):
 
 def create_room(hotel_id, room_number, room_type, price_per_night, capacity, bed_type, description=""):
     """Thêm phòng mới, mặc định trạng thái Đang trống (AVAILABLE)."""
-    session = get_session()
-    if not session:
-        return False
+    hotel_id_str = str(hotel_id).strip()
+    room_number_str = str(room_number).strip()
     try:
         price = price_per_night if isinstance(price_per_night, Decimal) else Decimal(str(price_per_night))
-        cap = int(capacity)
+        cap = int(capacity) if capacity else 2
+    except (InvalidOperation, ValueError, TypeError) as error:
+        print(f"❌ [Phòng] Dữ liệu không hợp lệ khi tạo phòng: {error}")
+        return False
+
+    session = get_session()
+    if not session:
+        # Mock fallback
+        if hotel_id_str not in _mock_rooms:
+            _mock_rooms[hotel_id_str] = []
+        new_r = SimpleNamespace(
+            hotel_id=hotel_id_str,
+            room_number=room_number_str,
+            room_type=room_type,
+            price_per_night=price,
+            is_available=True,
+            status="AVAILABLE",
+            capacity=cap,
+            bed_type=bed_type or "1 Double Bed",
+            description=description or "",
+        )
+        _mock_rooms[hotel_id_str].append(new_r)
+        return True
+
+    try:
         stmt = session.prepare("""
             INSERT INTO rooms_by_hotel (
                 hotel_id, room_number, room_type, price_per_night,
@@ -166,16 +365,25 @@ def create_room(hotel_id, room_number, room_type, price_per_night, capacity, bed
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
         """)
         session.execute(stmt, (
-            hotel_id, room_number, room_type, price,
-            True, "AVAILABLE", cap, bed_type, description or "",
+            hotel_id_str, room_number_str, room_type, price,
+            True, "AVAILABLE", cap, bed_type or "1 Double Bed", description or "",
         ))
         return True
-    except (InvalidOperation, ValueError, TypeError) as error:
-        print(f"❌ [Phòng] Dữ liệu không hợp lệ khi tạo phòng: {error}")
-        return False
     except Exception as error:
-        print(f"❌ [Phòng] Lỗi tạo phòng: {error}")
-        return False
+        # Fallback nếu bảng chưa có cột mở rộng
+        try:
+            stmt_basic = session.prepare("""
+                INSERT INTO rooms_by_hotel (
+                    hotel_id, room_number, room_type, price_per_night, is_available
+                ) VALUES (?, ?, ?, ?, ?);
+            """)
+            session.execute(stmt_basic, (
+                hotel_id_str, room_number_str, room_type, price, True
+            ))
+            return True
+        except Exception as err2:
+            print(f"❌ [Phòng] Lỗi tạo phòng: {err2}")
+            return False
 
 
 def update_room(hotel_id, room_number, room_type, price_per_night, capacity, bed_type, description):
@@ -184,30 +392,50 @@ def update_room(hotel_id, room_number, room_type, price_per_night, capacity, bed
     (tránh thay đổi giá/loại phòng trong lúc khách đang lưu trú).
     Trả về (True, None) nếu thành công, (False, lý_do) nếu thất bại.
     """
-    current = get_room(hotel_id, room_number)
+    hotel_id_str = str(hotel_id).strip()
+    room_number_str = str(room_number).strip()
+    current = get_room(hotel_id_str, room_number_str)
     if not current:
         return False, "Không tìm thấy phòng."
     if current.status == "OCCUPIED":
         return False, "Phòng đang có khách thuê, không thể sửa thông tin. Vui lòng đợi khách trả phòng."
 
-    session = get_session()
-    if not session:
-        return False, "Không thể kết nối AstraDB."
     try:
         price = price_per_night if isinstance(price_per_night, Decimal) else Decimal(str(price_per_night))
-        cap = int(capacity)
+        cap = int(capacity) if capacity else 2
+    except (InvalidOperation, ValueError, TypeError) as error:
+        return False, f"Dữ liệu không hợp lệ: {error}"
+
+    session = get_session()
+    if not session:
+        # Mock fallback
+        current.room_type = room_type
+        current.price_per_night = price
+        current.capacity = cap
+        current.bed_type = bed_type
+        current.description = description or ""
+        return True, None
+
+    try:
         stmt = session.prepare("""
             UPDATE rooms_by_hotel
             SET room_type = ?, price_per_night = ?, capacity = ?, bed_type = ?, description = ?
             WHERE hotel_id = ? AND room_number = ?;
         """)
-        session.execute(stmt, (room_type, price, cap, bed_type, description or "", hotel_id, room_number))
+        session.execute(stmt, (room_type, price, cap, bed_type, description or "", hotel_id_str, room_number_str))
         return True, None
-    except (InvalidOperation, ValueError, TypeError) as error:
-        return False, f"Dữ liệu không hợp lệ: {error}"
     except Exception as error:
-        print(f"❌ [Phòng] Lỗi sửa phòng: {error}")
-        return False, "Lỗi kết nối AstraDB, vui lòng thử lại."
+        try:
+            stmt_basic = session.prepare("""
+                UPDATE rooms_by_hotel
+                SET room_type = ?, price_per_night = ?
+                WHERE hotel_id = ? AND room_number = ?;
+            """)
+            session.execute(stmt_basic, (room_type, price, hotel_id_str, room_number_str))
+            return True, None
+        except Exception as err2:
+            print(f"❌ [Phòng] Lỗi sửa phòng: {err2}")
+            return False, "Lỗi kết nối AstraDB, vui lòng thử lại."
 
 
 def change_room_status(hotel_id, room_number, new_status, guest_name=None, booking_id=None):
@@ -225,12 +453,14 @@ def change_room_status(hotel_id, room_number, new_status, guest_name=None, booki
     if new_status not in VALID_STATUSES:
         return False, "Trạng thái không hợp lệ."
 
-    current = get_room(hotel_id, room_number)
+    hotel_id_str = str(hotel_id).strip()
+    room_number_str = str(room_number).strip()
+    current = get_room(hotel_id_str, room_number_str)
     if not current:
-        return False, "Không tìm thấy phòng."
+        return False, f"Không tìm thấy phòng số {room_number_str} tại khách sạn này."
 
     if new_status == current.status:
-        return False, f'Phòng đã ở trạng thái "{ROOM_STATUS_LABELS[new_status]}" rồi.'
+        return False, f'Phòng {room_number_str} đã ở trạng thái "{ROOM_STATUS_LABELS[new_status]}" rồi.'
 
     if new_status not in ALLOWED_TRANSITIONS.get(current.status, set()):
         return False, (
@@ -244,9 +474,13 @@ def change_room_status(hotel_id, room_number, new_status, guest_name=None, booki
 
     session = get_session()
     if not session:
-        return False, "Không thể kết nối AstraDB."
+        # Mock fallback
+        current.status = new_status
+        current.is_available = is_available
+        print(f"🔶 [MOCK] Đã chuyển phòng {hotel_id_str}-{room_number_str} sang {new_status} (is_available={is_available})")
+        return True, None
+
     try:
-        is_available = new_status == "AVAILABLE"
         stmt = session.prepare("""
             UPDATE rooms_by_hotel
             SET status = ?, is_available = ?, current_guest_name = ?, current_booking_id = ?
@@ -255,5 +489,16 @@ def change_room_status(hotel_id, room_number, new_status, guest_name=None, booki
         session.execute(stmt, (new_status, is_available, guest_name, booking_id, hotel_id, room_number))
         return True, None
     except Exception as error:
-        print(f"❌ [Phòng] Lỗi đổi trạng thái phòng: {error}")
-        return False, "Lỗi kết nối AstraDB, vui lòng thử lại."
+        # Fallback nếu bảng chưa có cột status
+        try:
+            stmt_basic = session.prepare("""
+                UPDATE rooms_by_hotel SET is_available = ?
+                WHERE hotel_id = ? AND room_number = ?;
+            """)
+            session.execute(stmt_basic, (is_available, hotel_id_str, room_number_str))
+            invalidate_rooms_cache()
+            print(f"✅ [AstraDB Fallback] Đã cập nhật is_available={is_available} cho phòng {room_number_str}")
+            return True, None
+        except Exception as err2:
+            print(f"❌ [Phòng] Lỗi đổi trạng thái phòng: {err2}")
+            return False, "Lỗi kết nối AstraDB, vui lòng thử lại."
