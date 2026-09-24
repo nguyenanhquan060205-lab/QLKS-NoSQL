@@ -9,7 +9,7 @@ import re
 
 from flask import Blueprint, flash, jsonify, redirect, render_template, request, url_for
 
-from services import hotel_service, location_service, room_service
+from services import booking_service, hotel_service, location_service, room_service
 
 hotel_bp = Blueprint('hotel', __name__)
 
@@ -462,10 +462,55 @@ def update_room(hotel_id, room_number):
     ), 400
 
 
+ACTIVE_BOOKING_STATUSES = ('CONFIRMED', 'CHECKED_IN', 'OCCUPIED', 'PENDING')
+
+
+def _close_active_booking(hotel_id, room):
+    """
+    Đóng booking đang gắn với phòng (status -> COMPLETED) trước khi trả phòng.
+    Trả về (True, None) nếu đã đóng hoặc không có booking nào đang mở,
+    (False, lý_do) nếu không đóng được — khi đó KHÔNG được giải phóng phòng.
+    """
+    active = booking_service.get_active_booking_for_room(hotel_id, room.room_number)
+    # get_active_booking_for_room() lùi về booking gần nhất kể cả khi đã đóng,
+    # nên phải tự kiểm tra lại status.
+    if not active or active.get('status') not in ACTIVE_BOOKING_STATUSES:
+        return True, None
+
+    if room.current_booking_id and active.get('booking_id') != room.current_booking_id:
+        return False, (
+            f"Phòng {room.room_number} đang gắn với đơn {room.current_booking_id} nhưng đơn còn mở "
+            f"lại là {active.get('booking_id')}. Vui lòng trả phòng từ danh sách đơn đặt phòng."
+        )
+
+    ok, result = booking_service.complete_booking(
+        guest_id=active.get('guest_id'),
+        booking_id=active.get('booking_id'),
+        hotel_id=hotel_id,
+        check_in_date=active.get('check_in_date'),
+        planned_check_out=active.get('check_out_date'),
+    )
+    if not ok:
+        return False, f'Không đóng được đơn {active.get("booking_id")}: {result}'
+    return True, None
+
+
 @hotel_bp.route('/hotels/<hotel_id>/rooms/<room_number>/status', methods=['POST'])
 def change_room_status(hotel_id, room_number):
     """Đổi trạng thái phòng (Trống / Đang thuê / Bảo trì) theo đúng ma trận cho phép."""
     new_status = request.form.get('status', '').strip()
+
+    # "Trả phòng" (OCCUPIED -> AVAILABLE) phải đóng booking TRƯỚC rồi mới giải phóng
+    # phòng — nếu chỉ đổi status phòng thì booking đứng mãi ở CONFIRMED và trang đặt
+    # phòng vẫn coi khách đang lưu trú. Cùng thứ tự với booking.checkout_booking.
+    if new_status == 'AVAILABLE':
+        room = room_service.get_room(hotel_id, room_number)
+        if room and room.status == 'OCCUPIED':
+            closed, close_error = _close_active_booking(hotel_id, room)
+            if not closed:
+                flash(close_error, 'error')
+                return redirect(url_for('hotel.room_detail', hotel_id=hotel_id, room_number=room_number))
+
     ok, error_message = room_service.change_room_status(hotel_id, room_number, new_status)
     if ok:
         label = room_service.ROOM_STATUS_LABELS.get(new_status, new_status)
