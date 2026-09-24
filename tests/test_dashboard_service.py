@@ -7,11 +7,13 @@ from decimal import Decimal
 from services import dashboard_service
 
 
+# Bảng counter "chưa có" -> dashboard lùi về đếm từ rooms_by_hotel (luồng cũ).
+@patch("services.dashboard_service.room_stats_service.get_counts", return_value=None)
 class DashboardServiceTest(unittest.TestCase):
     """Kiểm tra logic tổng hợp số liệu thống kê Dashboard & Trang chủ."""
 
     @patch("services.dashboard_service.get_session")
-    def test_get_dashboard_stats_empty_fallback(self, mock_get_session):
+    def test_get_dashboard_stats_empty_fallback(self, mock_get_session, _counts):
         mock_get_session.return_value = None
         stats = dashboard_service.get_dashboard_stats()
         self.assertEqual(stats["total_hotels"], 0)
@@ -24,7 +26,7 @@ class DashboardServiceTest(unittest.TestCase):
         self.assertEqual(stats["total_revenue"], 0)
 
     @patch("services.dashboard_service.get_session")
-    def test_get_dashboard_stats_calculates_correct_breakdown(self, mock_get_session):
+    def test_get_dashboard_stats_calculates_correct_breakdown(self, mock_get_session, _counts):
         mock_session = MagicMock()
         mock_get_session.return_value = mock_session
 
@@ -83,6 +85,8 @@ def _booking(booking_id, check_in, check_out, amount, status="CONFIRMED"):
     )
 
 
+# Bảng counter "chưa có" -> dashboard lùi về đếm từ rooms_by_hotel (luồng cũ).
+@patch("services.dashboard_service.room_stats_service.get_counts", return_value=None)
 class DashboardPeriodTest(unittest.TestCase):
     """Lọc kỳ theo thời gian lưu trú, ADR tính trên cùng một tập booking."""
 
@@ -100,26 +104,26 @@ class DashboardPeriodTest(unittest.TestCase):
                 period="custom", custom_start=start, custom_end=end,
             )
 
-    def test_stay_crossing_period_start_is_counted(self):
+    def test_stay_crossing_period_start_is_counted(self, _counts):
         # 29/08 -> 02/09: chỉ đêm 01/09 thuộc tháng 9 (ngày trả phòng không tính đêm)
         stats = self._report([_booking("BK1", date(2026, 8, 29), date(2026, 9, 2), "4000000")])
         self.assertEqual(stats["total_bookings"], 1)
         # 4 đêm, 1.000.000/đêm; đêm 01/09 thuộc kỳ -> ADR = 1.000.000
         self.assertEqual(stats["adr"], 1000000)
 
-    def test_last_night_of_period_is_counted(self):
+    def test_last_night_of_period_is_counted(self, _counts):
         # 30/09 -> 02/10: đêm 30/09 thuộc tháng 9, đêm 01/10 thì không
         stats = self._report([_booking("BK1", date(2026, 9, 30), date(2026, 10, 2), "3000000")])
         self.assertEqual(stats["total_bookings"], 1)
         self.assertEqual(stats["adr"], 1500000)
 
-    def test_stay_ending_on_period_start_is_excluded(self):
+    def test_stay_ending_on_period_start_is_excluded(self, _counts):
         # Trả phòng đúng 01/09 -> không có đêm nào trong tháng 9
         stats = self._report([_booking("BK1", date(2026, 8, 28), date(2026, 9, 1), "3000000")])
         self.assertEqual(stats["total_bookings"], 0)
         self.assertIsNone(stats["adr"])
 
-    def test_adr_does_not_mix_invoice_revenue(self):
+    def test_adr_does_not_mix_invoice_revenue(self, _counts):
         # Hóa đơn xuất trong kỳ của một booking ngoài kỳ không được làm lệch ADR
         stats = self._report(
             [_booking("BK1", date(2026, 9, 10), date(2026, 9, 12), "2000000")],
@@ -131,7 +135,7 @@ class DashboardPeriodTest(unittest.TestCase):
         self.assertEqual(stats["total_revenue"], 9000000.0)
         self.assertEqual(stats["adr"], 1000000)
 
-    def test_cancelled_booking_is_ignored(self):
+    def test_cancelled_booking_is_ignored(self, _counts):
         stats = self._report([
             _booking("BK1", date(2026, 9, 10), date(2026, 9, 12), "2000000"),
             _booking("BK2", date(2026, 9, 10), date(2026, 9, 12), "8000000", status="CANCELLED"),
