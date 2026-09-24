@@ -4,9 +4,22 @@
 # ====================================================================
 
 import os
+import sys
 from dotenv import load_dotenv
 
 load_dotenv()
+
+# Console Windows mặc định dùng cp1252, không in được emoji/tiếng Việt trong các
+# lệnh print() của app -> print() tự raise UnicodeEncodeError. Nguy hiểm nhất là
+# nhánh except bên dưới: kết nối lỗi (vd. DB đang hibernate) thì chính dòng in lỗi
+# làm crash, thay vì trả None để app lùi về mock. errors="replace" để không bao giờ
+# vì in log mà sập.
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, "reconfigure"):
+        try:
+            _stream.reconfigure(encoding="utf-8", errors="replace")
+        except (ValueError, OSError):
+            pass
 
 # Biến lưu session toàn cục
 _session = None

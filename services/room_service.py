@@ -355,6 +355,7 @@ def create_room(hotel_id, room_number, room_type, price_per_night, capacity, bed
             description=description or "",
         )
         _mock_rooms[hotel_id_str].append(new_r)
+        invalidate_rooms_cache()
         return True
 
     try:
@@ -368,6 +369,7 @@ def create_room(hotel_id, room_number, room_type, price_per_night, capacity, bed
             hotel_id_str, room_number_str, room_type, price,
             True, "AVAILABLE", cap, bed_type or "1 Double Bed", description or "",
         ))
+        invalidate_rooms_cache()
         return True
     except Exception as error:
         # Fallback nếu bảng chưa có cột mở rộng
@@ -380,6 +382,7 @@ def create_room(hotel_id, room_number, room_type, price_per_night, capacity, bed
             session.execute(stmt_basic, (
                 hotel_id_str, room_number_str, room_type, price, True
             ))
+            invalidate_rooms_cache()
             return True
         except Exception as err2:
             print(f"❌ [Phòng] Lỗi tạo phòng: {err2}")
@@ -414,6 +417,7 @@ def update_room(hotel_id, room_number, room_type, price_per_night, capacity, bed
         current.capacity = cap
         current.bed_type = bed_type
         current.description = description or ""
+        invalidate_rooms_cache()
         return True, None
 
     try:
@@ -423,6 +427,7 @@ def update_room(hotel_id, room_number, room_type, price_per_night, capacity, bed
             WHERE hotel_id = ? AND room_number = ?;
         """)
         session.execute(stmt, (room_type, price, cap, bed_type, description or "", hotel_id_str, room_number_str))
+        invalidate_rooms_cache()
         return True, None
     except Exception as error:
         try:
@@ -432,6 +437,7 @@ def update_room(hotel_id, room_number, room_type, price_per_night, capacity, bed
                 WHERE hotel_id = ? AND room_number = ?;
             """)
             session.execute(stmt_basic, (room_type, price, hotel_id_str, room_number_str))
+            invalidate_rooms_cache()
             return True, None
         except Exception as err2:
             print(f"❌ [Phòng] Lỗi sửa phòng: {err2}")

@@ -417,6 +417,87 @@ class HotelRoutesTest(unittest.TestCase):
         self.assertIn("Chưa rõ", response.get_data(as_text=True))
 
 
+def _occupied_room(booking_id="BK001"):
+    return SimpleNamespace(
+        hotel_id="MT_001", room_number="101", status="OCCUPIED",
+        current_guest_name="Nguyễn Văn An", current_booking_id=booking_id,
+    )
+
+
+def _active_booking(booking_id="BK001", status="CONFIRMED"):
+    return {
+        "booking_id": booking_id, "guest_id": "G001", "status": status,
+        "check_in_date": "2026-09-20", "check_out_date": "2026-09-25",
+    }
+
+
+@patch("routes.hotel_routes.room_service.change_room_status", return_value=(True, None))
+@patch("routes.hotel_routes.booking_service.complete_booking", return_value=(True, {}))
+@patch("routes.hotel_routes.booking_service.get_active_booking_for_room")
+@patch("routes.hotel_routes.room_service.get_room")
+class RoomCheckoutFromDetailTest(unittest.TestCase):
+    """Nút "Trả phòng" ở trang chi tiết phòng phải đóng booking rồi mới giải phóng phòng."""
+
+    def setUp(self):
+        app = Flask(__name__, template_folder="../templates")
+        app.config.update(TESTING=True, SECRET_KEY="test-secret")
+        app.register_blueprint(hotel_bp)
+        app.register_blueprint(booking_bp)
+        self.client = app.test_client()
+
+    def _post(self, status="AVAILABLE"):
+        return self.client.post("/hotels/MT_001/rooms/101/status", data={"status": status})
+
+    def test_checkout_closes_booking_then_frees_room(self, get_room, get_active, complete, change):
+        get_room.return_value = _occupied_room()
+        get_active.return_value = _active_booking()
+
+        response = self._post()
+
+        self.assertEqual(response.status_code, 302)
+        complete.assert_called_once_with(
+            guest_id="G001", booking_id="BK001", hotel_id="MT_001",
+            check_in_date="2026-09-20", planned_check_out="2026-09-25",
+        )
+        change.assert_called_once_with("MT_001", "101", "AVAILABLE")
+
+    def test_room_not_freed_when_closing_booking_fails(self, get_room, get_active, complete, change):
+        get_room.return_value = _occupied_room()
+        get_active.return_value = _active_booking()
+        complete.return_value = (False, "lỗi AstraDB")
+
+        self._post()
+
+        change.assert_not_called()
+
+    def test_room_not_freed_when_open_booking_mismatches_room(self, get_room, get_active, complete, change):
+        get_room.return_value = _occupied_room(booking_id="BK001")
+        get_active.return_value = _active_booking(booking_id="BK999")
+
+        self._post()
+
+        complete.assert_not_called()
+        change.assert_not_called()
+
+    def test_completed_booking_is_not_closed_again(self, get_room, get_active, complete, change):
+        get_room.return_value = _occupied_room()
+        get_active.return_value = _active_booking(status="COMPLETED")
+
+        self._post()
+
+        complete.assert_not_called()
+        change.assert_called_once_with("MT_001", "101", "AVAILABLE")
+
+    def test_maintenance_does_not_touch_bookings(self, get_room, get_active, complete, change):
+        get_room.return_value = SimpleNamespace(status="AVAILABLE")
+
+        self._post(status="MAINTENANCE")
+
+        get_active.assert_not_called()
+        complete.assert_not_called()
+        change.assert_called_once_with("MT_001", "101", "MAINTENANCE")
+
+
 if __name__ == "__main__":
     unittest.main()
 
