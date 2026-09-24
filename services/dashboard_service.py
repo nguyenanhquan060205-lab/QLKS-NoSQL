@@ -5,7 +5,7 @@
 
 import calendar
 import copy
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from types import SimpleNamespace
 
 from database.db import get_session
@@ -121,6 +121,34 @@ def resolve_period_range(period, custom_start=None, custom_end=None):
     return None, None, "Toàn bộ thời gian", None
 
 
+def _stay_overlaps(check_in, check_out, start, end):
+    """
+    Booking thuộc kỳ khi thời gian LƯU TRÚ giao với kỳ, không chỉ khi ngày nhận phòng
+    rơi vào kỳ. Đêm lưu trú là [check_in, check_out) — ngày trả phòng không tính đêm.
+    Ví dụ: 29/08 -> 02/09 có đêm 01/09 nên phải được tính vào kỳ "Tháng 9".
+    """
+    if not start and not end:
+        return True
+    if not check_in:
+        return False
+    # Thiếu ngày trả phòng thì coi như lưu trú đúng 1 đêm check_in.
+    last_night = check_out if check_out and check_out > check_in else check_in + timedelta(days=1)
+    if end and check_in > end:
+        return False
+    if start and last_night <= start:
+        return False
+    return True
+
+
+def _nights_in_window(check_in, check_out, start, end):
+    """Số đêm của booking nằm trong kỳ [start, end] (end tính trọn ngày cuối kỳ)."""
+    if not check_in or not check_out or check_out <= check_in:
+        return 0
+    window_start = max(check_in, start) if start else check_in
+    window_end = min(check_out, end + timedelta(days=1)) if end else check_out
+    return max(0, (window_end - window_start).days)
+
+
 def _in_range(d, start, end):
     # Không lọc kỳ nào (period="all") thì lấy TẤT, kể cả bản ghi thiếu ngày. Nếu trả
     # False cho d=None ngay cả khi không lọc thì mọi hóa đơn/booking bị NULL ngày sẽ
@@ -147,12 +175,9 @@ def get_dashboard_report(hotel_id=None, period="all", custom_start=None, custom_
       - hotels: danh sách khách sạn
       - rooms_by_hotel: đếm tổng phòng & phòng trống, group theo hotel_id
       - bookings_by_guest: có đủ hotel_id + check_in_date + check_out_date + total_amount
-        nên dùng để tính lượt đặt và tỷ lệ lấp đầy (occupancy) theo kỳ
+        nên dùng để tính lượt đặt, số đêm phòng đã bán và ADR theo kỳ. Booking thuộc
+        kỳ khi thời gian lưu trú giao với kỳ (_stay_overlaps), bỏ qua đơn CANCELLED.
       - invoices_by_booking: dùng để tính doanh thu thực tế theo kỳ (theo issue_date)
-
-    Tỷ lệ lấp đầy (Occupancy Rate) = (số đêm phòng đã bán trong kỳ) /
-    (tổng số phòng x số ngày trong kỳ) x 100%. Chỉ tính được khi có kỳ cụ thể
-    (period khác 'all'), vì 'toàn bộ thời gian' không có mẫu số ngày rõ ràng.
     """
     session = get_session()
     start_date, end_date, period_label, custom_range_error = resolve_period_range(period, custom_start, custom_end)
@@ -188,12 +213,9 @@ def get_dashboard_report(hotel_id=None, period="all", custom_start=None, custom_
             {"hotel_id": r.hotel_id, "name": getattr(r, "name", None) or r.hotel_id}
             for r in hotel_rows
         ]
-        # Chỉ tính các cơ sở thật của chuỗi (mã "MT_"), bỏ những row tạo ra để test
-        # (H_QLKS04_TEST...). Nếu không có row MT_ nào thì giữ nguyên toàn bộ, để
-        # database mới chưa theo quy ước đặt mã vẫn thống kê đúng.
-        mt_hotels = [h for h in hotels if str(h["hotel_id"]).startswith("MT_")]
-        if mt_hotels:
-            hotels = mt_hotels
+        # Đếm MỌI khách sạn trong bảng hotels. Không lọc theo tiền tố mã "MT_": khách
+        # sạn thêm từ giao diện được cấp mã "H" + uuid (hotel_routes.add_hotel), lọc
+        # theo tiền tố sẽ làm mọi chi nhánh mới biến mất khỏi thống kê.
     except Exception as error:
         print(f"❌ [Dashboard] Lỗi lấy danh sách khách sạn: {error}")
 
@@ -202,8 +224,13 @@ def get_dashboard_report(hotel_id=None, period="all", custom_start=None, custom_
         # (index.html) và biểu đồ tròn trạng thái phòng cần 2 con số này, chứ
         # is_available chỉ nói được trống / không trống.
         room_rows = session.execute("SELECT hotel_id, is_available, status FROM rooms_by_hotel;")
+        known_hotel_ids = {h["hotel_id"] for h in hotels}
         for r in room_rows:
             hid = getattr(r, "hotel_id", None)
+            # Bỏ phòng mồ côi (khách sạn đã bị xóa/không tồn tại) để tổng phòng
+            # khớp với danh sách khách sạn đang thống kê.
+            if known_hotel_ids and hid not in known_hotel_ids:
+                continue
             rooms_total[hid] = rooms_total.get(hid, 0) + 1
             if getattr(r, "is_available", False):
                 rooms_available[hid] = rooms_available.get(hid, 0) + 1
@@ -216,7 +243,7 @@ def get_dashboard_report(hotel_id=None, period="all", custom_start=None, custom_
 
     try:
         booking_rows = session.execute(
-            "SELECT booking_id, hotel_id, check_in_date, check_out_date, total_amount "
+            "SELECT booking_id, hotel_id, check_in_date, check_out_date, status, total_amount "
             "FROM bookings_by_guest;"
         )
         # Row của cassandra-driver bất biến (namedtuple) nên không sửa được thuộc tính
@@ -230,6 +257,8 @@ def get_dashboard_report(hotel_id=None, period="all", custom_start=None, custom_
                 total_amount=getattr(r, "total_amount", None),
             )
             for r in booking_rows
+            # Đơn đã hủy không chiếm phòng và không phát sinh doanh thu tiền phòng.
+            if (getattr(r, "status", None) or "").upper() != "CANCELLED"
         ]
     except Exception as error:
         print(f"❌ [Dashboard] Lỗi lấy danh sách đặt phòng: {error}")
@@ -278,27 +307,33 @@ def get_dashboard_report(hotel_id=None, period="all", custom_start=None, custom_
         maintenance_rooms = sum(rooms_maintenance.values())
         total_hotels = len(hotels)
 
-    filtered_bookings = [b for b in scoped_bookings if _in_range(b.check_in_date, start_date, end_date)]
+    filtered_bookings = [
+        b for b in scoped_bookings
+        if _stay_overlaps(b.check_in_date, b.check_out_date, start_date, end_date)
+    ]
     filtered_invoices = [i for i in scoped_invoices if _in_range(i.issue_date, start_date, end_date)]
 
     total_bookings = len(filtered_bookings)
     total_revenue = sum(float(i.total_amount) for i in filtered_invoices if i.total_amount is not None)
 
-    # Số đêm phòng đã bán trong kỳ (cắt phần booking nằm ngoài khoảng lọc)
+    # ADR = doanh thu tiền phòng của các đêm trong kỳ / số đêm phòng đã bán trong kỳ.
+    # Tử số và mẫu số lấy từ CÙNG một tập booking: tiền của mỗi booking chia đều cho
+    # số đêm của nó, rồi chỉ cộng phần đêm nằm trong kỳ. Không dùng total_revenue
+    # (theo issue_date của hóa đơn) vì đó là tập khác — trộn hai tập làm ADR sai.
     room_nights_sold = 0
+    room_revenue = 0.0
     for b in filtered_bookings:
-        check_in, check_out = b.check_in_date, b.check_out_date
-        if not check_in or not check_out or check_out <= check_in:
+        nights_in_period = _nights_in_window(b.check_in_date, b.check_out_date, start_date, end_date)
+        if not nights_in_period:
             continue
-        window_start = max(check_in, start_date) if start_date else check_in
-        window_end = min(check_out, end_date) if end_date else check_out
-        nights = (window_end - window_start).days
-        if nights > 0:
-            room_nights_sold += nights
+        room_nights_sold += nights_in_period
+        total_nights = (b.check_out_date - b.check_in_date).days
+        if b.total_amount is not None:
+            room_revenue += float(b.total_amount) * nights_in_period / total_nights
 
     adr = None
     if room_nights_sold:
-        adr = round(total_revenue / room_nights_sold, 0)
+        adr = round(room_revenue / room_nights_sold, 0)
 
     # So sánh giữa các khách sạn — chỉ có ý nghĩa khi đang xem "Tất cả khách sạn"
     hotel_breakdown = []
