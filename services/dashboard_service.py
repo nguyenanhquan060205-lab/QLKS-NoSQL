@@ -9,6 +9,7 @@ from datetime import date, datetime, timedelta
 from types import SimpleNamespace
 
 from database.db import get_session
+from services import room_stats_service
 
 _EMPTY_REPORT = {
     "hotels": [],
@@ -173,7 +174,8 @@ def get_dashboard_report(hotel_id=None, period="all", custom_start=None, custom_
     phù hợp với quy mô dữ liệu đồ án; xem ghi chú ở dashboard_service cũ về việc tránh
     ALLOW FILTERING trên cột không phải khóa):
       - hotels: danh sách khách sạn
-      - rooms_by_hotel: đếm tổng phòng & phòng trống, group theo hotel_id
+      - room_status_counts_by_hotel (bảng COUNTER): số phòng theo trạng thái của
+        từng khách sạn; chưa có bảng thì lùi về đếm từ rooms_by_hotel
       - bookings_by_guest: có đủ hotel_id + check_in_date + check_out_date + total_amount
         nên dùng để tính lượt đặt, số đêm phòng đã bán và ADR theo kỳ. Booking thuộc
         kỳ khi thời gian lưu trú giao với kỳ (_stay_overlaps), bỏ qua đơn CANCELLED.
@@ -219,27 +221,25 @@ def get_dashboard_report(hotel_id=None, period="all", custom_start=None, custom_
     except Exception as error:
         print(f"❌ [Dashboard] Lỗi lấy danh sách khách sạn: {error}")
 
+    # Số phòng theo trạng thái: đọc từ bảng COUNTER room_status_counts_by_hotel
+    # (1 dòng / khách sạn, cập nhật ngay khi phòng đổi trạng thái) thay vì quét
+    # toàn bảng rooms_by_hotel. Bảng counter chưa tạo / chưa có dữ liệu thì lùi về
+    # quét bảng phòng như cũ, để dashboard không bao giờ trắng số.
+    # Chỉ lấy khách sạn còn tồn tại: bỏ phòng/counter mồ côi của khách sạn đã xóa.
+    known_hotel_ids = {h["hotel_id"] for h in hotels}
     try:
-        # Lấy thêm cột status để tách được Đang cho thuê / Đang bảo trì — trang chủ
-        # (index.html) và biểu đồ tròn trạng thái phòng cần 2 con số này, chứ
-        # is_available chỉ nói được trống / không trống.
-        room_rows = session.execute("SELECT hotel_id, is_available, status FROM rooms_by_hotel;")
-        known_hotel_ids = {h["hotel_id"] for h in hotels}
-        for r in room_rows:
-            hid = getattr(r, "hotel_id", None)
-            # Bỏ phòng mồ côi (khách sạn đã bị xóa/không tồn tại) để tổng phòng
-            # khớp với danh sách khách sạn đang thống kê.
+        room_counts = room_stats_service.get_counts(session)
+        if room_counts is None:
+            room_counts = room_stats_service.count_from_rooms(session)
+        for hid, counts in room_counts.items():
             if known_hotel_ids and hid not in known_hotel_ids:
                 continue
-            rooms_total[hid] = rooms_total.get(hid, 0) + 1
-            if getattr(r, "is_available", False):
-                rooms_available[hid] = rooms_available.get(hid, 0) + 1
-            elif getattr(r, "status", None) == "MAINTENANCE":
-                rooms_maintenance[hid] = rooms_maintenance.get(hid, 0) + 1
-            else:
-                rooms_occupied[hid] = rooms_occupied.get(hid, 0) + 1
+            rooms_total[hid] = counts["total_rooms"]
+            rooms_available[hid] = counts["available_rooms"]
+            rooms_occupied[hid] = counts["occupied_rooms"]
+            rooms_maintenance[hid] = counts["maintenance_rooms"]
     except Exception as error:
-        print(f"❌ [Dashboard] Lỗi lấy danh sách phòng: {error}")
+        print(f"❌ [Dashboard] Lỗi lấy số phòng: {error}")
 
     try:
         booking_rows = session.execute(

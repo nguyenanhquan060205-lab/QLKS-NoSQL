@@ -112,6 +112,27 @@ CREATE TABLE IF NOT EXISTS invoices_by_booking (
 
 
 -- ====================================================================
+-- PHẦN CỦA NHƯ: BẢNG COUNTER CHO DASHBOARD
+-- ====================================================================
+
+-- Bảng 7: Số phòng theo trạng thái của từng khách sạn (Dashboard / Trang chủ)
+-- Query: "Mỗi khách sạn có bao nhiêu phòng trống / đang thuê / bảo trì?"
+-- Gộp sẵn bằng kiểu COUNTER thay vì quét toàn bảng rooms_by_hotel mỗi lần mở dashboard.
+-- Quy tắc của bảng counter: mọi cột ngoài khóa chính đều phải là counter, chỉ
+-- cập nhật bằng "cột = cột + n", không INSERT, và không được chung BATCH với lệnh thường.
+-- Cập nhật bởi room_service.create_room() và change_room_status().
+-- Nạp số liệu ban đầu / đồng bộ lại: python scripts/sync_room_status_counts.py
+CREATE TABLE IF NOT EXISTS room_status_counts_by_hotel (
+    hotel_id text,
+    total_rooms counter,
+    available_rooms counter,
+    occupied_rooms counter,
+    maintenance_rooms counter,
+    PRIMARY KEY (hotel_id)
+);
+
+
+-- ====================================================================
 -- DỮ LIỆU MẪU CHUỖI KHÁCH SẠN MƯỜNG THANH HOSPITALITY (MT_001 - MT_005)
 -- ====================================================================
 

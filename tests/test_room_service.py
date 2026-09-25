@@ -140,12 +140,18 @@ class ChangeRoomStatusTest(unittest.TestCase):
 
         self.assertTrue(ok, msg=f"trả phòng phải thành công, nhận lỗi: {err}")
         self.assertIsNone(err)
-        self.assertEqual(len(self.executed), 1)
+        # 1 lệnh UPDATE phòng + 1 lệnh cập nhật counter thống kê (ghi riêng, sau)
+        self.assertEqual(len(self.executed), 2)
 
         query, params = self.executed[0]
         self.assertIn("UPDATE rooms_by_hotel", query)
         # AVAILABLE -> is_available phải True, và 2 cột khách phải bị xóa về None
         self.assertEqual(params, ("AVAILABLE", True, None, None, "MT_004", "102"))
+
+        counter_query, counter_params = self.executed[1]
+        self.assertIn("UPDATE room_status_counts_by_hotel", counter_query)
+        # (total, available, occupied, maintenance, hotel_id): OCCUPIED -1, AVAILABLE +1
+        self.assertEqual(counter_params, (0, 1, -1, 0, "MT_004"))
 
     def test_occupied_keeps_guest_info_and_sets_unavailable(self):
         room = SimpleNamespace(hotel_id="MT_004", room_number="102", status="AVAILABLE")
@@ -182,6 +188,7 @@ class ChangeRoomStatusTest(unittest.TestCase):
 
         self.assertFalse(ok)
         self.assertIn("Không thể chuyển", err)
+        # Bị chặn thì không ghi gì, kể cả counter
         self.assertEqual(self.executed, [])
 
     def test_query_failure_message_is_not_mislabeled_as_connection_error(self):

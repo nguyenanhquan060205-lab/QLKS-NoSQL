@@ -13,6 +13,7 @@ from decimal import Decimal, InvalidOperation
 from types import SimpleNamespace
 
 from database.db import get_session
+from services import room_stats_service
 
 # Trạng thái phòng: value lưu trong Cassandra (text) -> nhãn hiển thị tiếng Việt
 ROOM_STATUSES = [
@@ -370,6 +371,7 @@ def create_room(hotel_id, room_number, room_type, price_per_night, capacity, bed
             True, "AVAILABLE", cap, bed_type or "1 Double Bed", description or "",
         ))
         invalidate_rooms_cache()
+        room_stats_service.record_room_created(session, hotel_id_str, "AVAILABLE")
         return True
     except Exception as error:
         # Fallback nếu bảng chưa có cột mở rộng
@@ -383,6 +385,7 @@ def create_room(hotel_id, room_number, room_type, price_per_night, capacity, bed
                 hotel_id_str, room_number_str, room_type, price, True
             ))
             invalidate_rooms_cache()
+            room_stats_service.record_room_created(session, hotel_id_str, "AVAILABLE")
             return True
         except Exception as err2:
             print(f"❌ [Phòng] Lỗi tạo phòng: {err2}")
@@ -499,6 +502,9 @@ def change_room_status(hotel_id, room_number, new_status, guest_name=None, booki
         """)
         session.execute(stmt, (new_status, is_available, guest_name, booking_id, hotel_id_str, room_number_str))
         invalidate_rooms_cache()
+        # Ghi counter SAU khi UPDATE phòng thành công (counter không được chung BATCH
+        # với lệnh thường). Lỗi counter chỉ cảnh báo, không làm hỏng việc đổi trạng thái.
+        room_stats_service.record_status_change(session, hotel_id_str, current.status, new_status)
         return True, None
     except Exception as error:
         # Fallback cho database cũ chưa có cột status / current_guest_name
@@ -510,6 +516,7 @@ def change_room_status(hotel_id, room_number, new_status, guest_name=None, booki
             """)
             session.execute(stmt_basic, (is_available, hotel_id_str, room_number_str))
             invalidate_rooms_cache()
+            room_stats_service.record_status_change(session, hotel_id_str, current.status, new_status)
             print(f"✅ [AstraDB Fallback] Đã cập nhật is_available={is_available} cho phòng {room_number_str}")
             return True, None
         except Exception as err2:
