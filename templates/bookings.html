@@ -10,10 +10,20 @@
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
                 <h1 id="bookings-heading" class="text-2xl sm:text-3xl font-extrabold text-slate-950 tracking-tight">
-                    Đặt phòng
+                    {% if search_type == 'guest' and bookings and bookings[0].guest_name %}
+                        Lịch sử đặt phòng: {{ bookings[0].guest_name }}
+                    {% elif search_type == 'hotel_date' %}
+                        Danh sách Check-in theo Khách sạn & Ngày (Q3)
+                    {% else %}
+                        Đặt phòng
+                    {% endif %}
                 </h1>
                 <p class="mt-1 text-sm sm:text-base text-slate-600">
-                    Tìm kiếm phòng trống theo tiện nghi, tạo đơn lưu trú nhanh và tra cứu đơn đặt phòng (Q2, Q3).
+                    {% if search_type == 'guest' and bookings and bookings[0].guest_name %}
+                        Tra cứu toàn bộ lịch sử lưu trú của khách hàng {{ bookings[0].guest_name }} qua Partition Key (Query Q2).
+                    {% else %}
+                        Tìm kiếm phòng trống theo tiện nghi, tạo đơn lưu trú nhanh và tra cứu đơn đặt phòng (Q2, Q3).
+                    {% endif %}
                 </p>
             </div>
             <!-- NÚT CHUYỂN ĐỔI TAB -->
@@ -331,12 +341,13 @@
                 </div>
             </div>
         {% elif search_type == 'guest' %}
+            {% set current_guest_display = (bookings[0].guest_name if bookings and bookings[0].guest_name else guest_id) %}
             <div class="rounded-2xl border border-cyan-300 bg-cyan-50/90 p-4 text-sm text-cyan-950 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
                 <div class="flex items-center gap-3">
                     <span class="inline-flex items-center justify-center px-2.5 py-1 rounded-md bg-cyan-900 text-white font-bold text-xs">CQL Q2</span>
                     <div>
-                        <p class="font-bold text-cyan-950">Đang thực hiện truy vấn Q2 (bookings_by_guest)</p>
-                        <p class="text-xs text-cyan-800 font-mono mt-0.5">Partition Key: guest_id = '{{ guest_id }}'</p>
+                        <p class="font-bold text-cyan-950">Lịch sử đặt phòng của khách: <span class="text-cyan-900 underline font-extrabold">{{ current_guest_display }}</span></p>
+                        <p class="text-xs text-cyan-800 font-mono mt-0.5">Partition Key: guest_id = '{{ guest_id }}'{% if bookings and bookings[0].guest_phone %} · SĐT: {{ bookings[0].guest_phone }}{% endif %}{% if bookings and bookings[0].guest_id_card %} · CCCD: {{ bookings[0].guest_id_card }}{% endif %}</p>
                     </div>
                 </div>
                 <div class="text-xs font-semibold text-cyan-900 bg-cyan-200/70 px-3 py-1.5 rounded-lg w-fit">
