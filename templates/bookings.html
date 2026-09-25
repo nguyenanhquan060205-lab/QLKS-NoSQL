@@ -5,14 +5,29 @@
 {% block content %}
 <section aria-labelledby="bookings-heading" class="w-full space-y-6">
 
-    <!-- TIÊU ĐỀ TRANG -->
+    <!-- TIÊU ĐỀ TRANG & CHUYỂN TAB -->
     <div class="border-b border-slate-200/80 pb-5">
-        <h1 id="bookings-heading" class="text-2xl sm:text-3xl font-extrabold text-slate-950 tracking-tight">
-            Đặt phòng
-        </h1>
-        <p class="mt-1 text-sm sm:text-base text-slate-600">
-            Tìm kiếm phòng trống theo tiện nghi và tạo đơn lưu trú nhanh tại các chi nhánh Mường Thanh.
-        </p>
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+                <h1 id="bookings-heading" class="text-2xl sm:text-3xl font-extrabold text-slate-950 tracking-tight">
+                    Đặt phòng
+                </h1>
+                <p class="mt-1 text-sm sm:text-base text-slate-600">
+                    Tìm kiếm phòng trống theo tiện nghi, tạo đơn lưu trú nhanh và tra cứu đơn đặt phòng (Q2, Q3).
+                </p>
+            </div>
+            <!-- NÚT CHUYỂN ĐỔI TAB -->
+            <div class="inline-flex rounded-xl bg-slate-100 p-1 border border-slate-200 self-start sm:self-auto">
+                <a href="{{ url_for('booking.list_bookings', tab='rooms') }}"
+                   class="inline-flex items-center px-4 py-2 rounded-lg text-sm font-semibold transition {% if tab == 'rooms' %}bg-white text-slate-900 shadow-xs{% else %}text-slate-600 hover:text-slate-900{% endif %}">
+                    Khám phá phòng trống
+                </a>
+                <a href="{{ url_for('booking.list_bookings', tab='orders') }}"
+                   class="inline-flex items-center px-4 py-2 rounded-lg text-sm font-semibold transition {% if tab != 'rooms' %}bg-amber-900 text-white shadow-xs{% else %}text-slate-600 hover:text-slate-900{% endif %}">
+                    Danh sách đơn đặt phòng
+                </a>
+            </div>
+        </div>
     </div>
 
     {% if tab == 'rooms' %}
@@ -301,6 +316,34 @@
         <!-- ============================================================== -->
         <!-- CHẾ ĐỘ 2: QUẢN LÝ DANH SÁCH ĐƠN ĐÃ ĐẶT (BOOKINGS TABLE)         -->
         <!-- ============================================================== -->
+
+        {% if search_type == 'hotel_date' %}
+            <div class="rounded-2xl border border-amber-300 bg-amber-50/90 p-4 text-sm text-amber-950 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+                <div class="flex items-center gap-3">
+                    <span class="inline-flex items-center justify-center px-2.5 py-1 rounded-md bg-amber-900 text-white font-bold text-xs">CQL Q3</span>
+                    <div>
+                        <p class="font-bold text-amber-950">Đang thực hiện truy vấn Q3 (bookings_by_hotel_date)</p>
+                        <p class="text-xs text-amber-800 font-mono mt-0.5">Composite Partition Key: ((hotel_id, check_in_date)) = (('{{ hotel_id }}', '{{ check_in_date }}'))</p>
+                    </div>
+                </div>
+                <div class="text-xs font-semibold text-amber-900 bg-amber-200/70 px-3 py-1.5 rounded-lg w-fit">
+                    Khớp {{ bookings|length }} đơn check-in
+                </div>
+            </div>
+        {% elif search_type == 'guest' %}
+            <div class="rounded-2xl border border-cyan-300 bg-cyan-50/90 p-4 text-sm text-cyan-950 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+                <div class="flex items-center gap-3">
+                    <span class="inline-flex items-center justify-center px-2.5 py-1 rounded-md bg-cyan-900 text-white font-bold text-xs">CQL Q2</span>
+                    <div>
+                        <p class="font-bold text-cyan-950">Đang thực hiện truy vấn Q2 (bookings_by_guest)</p>
+                        <p class="text-xs text-cyan-800 font-mono mt-0.5">Partition Key: guest_id = '{{ guest_id }}'</p>
+                    </div>
+                </div>
+                <div class="text-xs font-semibold text-cyan-900 bg-cyan-200/70 px-3 py-1.5 rounded-lg w-fit">
+                    Khớp {{ bookings|length }} đơn của khách
+                </div>
+            </div>
+        {% endif %}
 
         <!-- BỘ LỌC TÌM KIẾM ĐƠN ĐẶT PHÒNG -->
         <div class="rounded-3xl border border-slate-200 bg-white p-5 sm:p-7 shadow-xs">
